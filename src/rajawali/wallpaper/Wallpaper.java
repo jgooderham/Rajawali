@@ -11,6 +11,7 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.opengl.GLSurfaceView;
+import android.opengl.GLSurfaceView.EGLConfigChooser;
 import android.os.Build;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
@@ -277,6 +278,14 @@ public abstract class Wallpaper extends WallpaperService {
 		protected RajawaliRenderer mRenderer;
 		protected GLWallpaperSurfaceView mSurfaceView;
 		protected boolean mMultisampling;
+		protected int mRSize = 5;
+		protected int mGSize = 6;
+		protected int mBSize = 5;
+		protected int mASize = 0;
+		protected int mDepthSize = 16;
+		protected int mStencilSize = 0;
+
+		protected ConfigChooser mConfigChooser = null;
 
 		public WallpaperEngine(SharedPreferences preferences, Context context, RajawaliRenderer renderer) {
 			this(preferences, context, renderer, false);
@@ -284,11 +293,27 @@ public abstract class Wallpaper extends WallpaperService {
 
 		public WallpaperEngine(SharedPreferences preferences, Context context, RajawaliRenderer renderer,
 				boolean useMultisampling) {
+			this( preferences, context, renderer, useMultisampling, 5, 6, 5, 0, 16, 0 );
+		}
+
+		public WallpaperEngine(SharedPreferences preferences, Context context, RajawaliRenderer renderer,
+				boolean useMultisampling, int rSize, int gSize, int bSize, int aSize) {
+			this( preferences, context, renderer, useMultisampling, rSize, gSize, bSize, aSize, 16, 0 );
+		}
+
+		public WallpaperEngine(SharedPreferences preferences, Context context, RajawaliRenderer renderer,
+				boolean useMultisampling, int rSize, int gSize, int bSize, int aSize, int depthSize, int stencilSize) {
 			mContext = context;
 			mRenderer = renderer;
 			mRenderer.setSharedPreferences(preferences);
 			mRenderer.setEngine(this);
 			mMultisampling = useMultisampling;
+			mRSize = rSize;
+			mGSize = gSize;
+			mBSize = bSize;
+			mASize = aSize;
+			mDepthSize = depthSize;
+			mStencilSize = stencilSize;
 		}
 
 		@Override
@@ -320,8 +345,11 @@ public abstract class Wallpaper extends WallpaperService {
 
 			mSurfaceView = new GLWallpaperSurfaceView(mContext);
 			mSurfaceView.setEGLContextClientVersion(2);
-			mSurfaceView.setEGLConfigChooser(new ConfigChooser(5, 6, 5, 0, 16, 0, mMultisampling));
+
+			mSurfaceView.setEGLConfigChooser(new ConfigChooser(mRSize, mGSize, mBSize, mASize, mDepthSize, mStencilSize, mMultisampling));
+			// mSurfaceView.setEGLConfigChooser(new ConfigChooser(5, 6, 5, 0, 16, 0, mMultisampling));
 			// mSurfaceView.setEGLConfigChooser(new ConfigChooser(8, 8, 8, 8, 16, 0));
+
 			mSurfaceView.setRenderer(mRenderer);
 			mSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 

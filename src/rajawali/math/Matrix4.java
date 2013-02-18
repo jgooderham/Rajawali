@@ -3,6 +3,9 @@ package rajawali.math;
 public final class Matrix4 {
 	private float[] m; 
 	private float[] mTmp;
+
+	static private Number3D tmpVec = new Number3D();
+	static private Number3D tmpVec2 = new Number3D();
 	
 	public Matrix4() {
 		m = new float[16];
@@ -15,6 +18,10 @@ public final class Matrix4 {
 		set(mTmp);
 	}
 	
+	public float[] val() {
+		return m;
+	}
+
 	public Matrix4(float m00, float m01, float m02, float m03,
             float m10, float m11, float m12, float m13,
             float m20, float m21, float m22, float m23,
@@ -164,30 +171,39 @@ public final class Matrix4 {
         m[12] = 0; m[13] = 0; m[14] = 0; m[15] = 1;
     }
 	
-	public void inverseTransform(final Number3D position, final Number3D scale, final Quaternion orientation)
+	public void transform(final Number3D position, final Quaternion orientation)
     {
-        Number3D invTranslate = position.inverse();
-        Number3D invScale = new Number3D(1 / scale.x, 1 / scale.y, 1 / scale.z);
-        Quaternion invRot = orientation.inverse();
+        orientation.toRotationMatrix(mTmp);
 
-        invTranslate = invRot.multiply(invTranslate);
-        invTranslate.multiply(invScale);
-        invRot.toRotationMatrix(mTmp);
-
-        m[0] = invScale.x * mTmp[0]; m[1] = invScale.x * mTmp[1]; m[2] = invScale.x * mTmp[2]; m[3] = invTranslate.x;
-        m[4] = invScale.y * mTmp[4]; m[5] = invScale.y * mTmp[5]; m[6] = invScale.y * mTmp[6]; m[7] = invTranslate.y;
-        m[8] = invScale.z * mTmp[8]; m[9] = invScale.z * mTmp[9]; m[10] = invScale.z * mTmp[10]; m[11] = invTranslate.z;		
+        m[0] = mTmp[0]; m[1] = mTmp[1]; m[2] = mTmp[2]; m[3] = position.x;
+        m[4] = mTmp[4]; m[5] = mTmp[5]; m[6] = mTmp[6]; m[7] = position.y;
+        m[8] = mTmp[8]; m[9] = mTmp[9]; m[10] = mTmp[10]; m[11] = position.z;
         m[12] = 0; m[13] = 0; m[14] = 0; m[15] = 1;
     }
 	
-	public Number3D transform(final Number3D v) {
-		return new Number3D(
-				v.x * m[0] + v.y * m[4] + v.z * m[8] + m[12],
-				v.x * m[1] + v.y * m[5] + v.z * m[9] + m[13],
-				v.x * m[2] + v.y * m[6] + v.z * m[10] + m[14]
-				);
-	}
+	public void inverseTransform(final Number3D position, final Number3D scale, final Quaternion orientation)
+    {
+        tmpVec.setAll(-position.x, -position.y, -position.z);
+        tmpVec2.setAll(1 / scale.x, 1 / scale.y, 1 / scale.z);
+        Quaternion invRot = orientation.inverse();
+
+        invRot.multiply(tmpVec, tmpVec);
+        tmpVec.multiply(tmpVec2);
+        invRot.toRotationMatrix(mTmp);
+
+        m[0] = tmpVec2.x * mTmp[0]; m[1] = tmpVec2.x * mTmp[1]; m[2] = tmpVec2.x * mTmp[2]; m[3] = tmpVec.x;
+        m[4] = tmpVec2.y * mTmp[4]; m[5] = tmpVec2.y * mTmp[5]; m[6] = tmpVec2.y * mTmp[6]; m[7] = tmpVec.y;
+        m[8] = tmpVec2.z * mTmp[8]; m[9] = tmpVec2.z * mTmp[9]; m[10] = tmpVec2.z * mTmp[10]; m[11] = tmpVec.z;		
+        m[12] = 0; m[13] = 0; m[14] = 0; m[15] = 1;
+    }
 	
+	public void transform(Number3D v) {
+		tmpVec.setAllFrom(v);
+		v.x = tmpVec.x * m[0] + tmpVec.y * m[4] + tmpVec.z * m[8] + m[12];
+		v.y = tmpVec.x * m[1] + tmpVec.y * m[5] + tmpVec.z * m[9] + m[13];
+		v.z = tmpVec.x * m[2] + tmpVec.y * m[6] + tmpVec.z * m[10] + m[14];
+	}
+
 	public void toFloatArray(float[] floatArray) {
 		System.arraycopy(m, 0, floatArray, 0, 16);
 	}
@@ -228,6 +244,14 @@ public final class Matrix4 {
          r.z = ( m[8] * v.x + m[8] * v.y + m[10] * v.z + m[11] ) * inv;
 
          return r;
+	}
+	
+	public void multiply(final Number3D v, Number3D result) {
+		float inv = 1.0f / ( m[12] * v.x + m[13] * v.y + m[14] * v.z + m[15] );
+
+		result.x = ( m[0] * v.x + m[1] * v.y + m[2] * v.z + m[3] ) * inv;
+		result.y = ( m[4] * v.x + m[5] * v.y + m[6] * v.z + m[7] ) * inv;
+		result.z = ( m[8] * v.x + m[8] * v.y + m[10] * v.z + m[11] ) * inv;
 	}
 	
 	public Matrix4 multiply(final float value) {
@@ -383,5 +407,13 @@ public final class Matrix4 {
 	        0,		0,		0,		1.0f
         );
     }
+
+    @Override
+    public String toString() {
     
+      return	m[ 0] + ", " + m[ 1] + ", " + m[ 2] + ", " + m[ 3] + "\n" +
+      				m[ 4] + ", " + m[ 5] + ", " + m[ 6] + ", " + m[ 7] + "\n" +
+      				m[ 8] + ", " + m[ 9] + ", " + m[10] + ", " + m[11] + "\n" +
+      				m[12] + ", " + m[13] + ", " + m[14] + ", " + m[15];
+    }
 }

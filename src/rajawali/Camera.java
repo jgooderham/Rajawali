@@ -1,6 +1,7 @@
 package rajawali;
 
 import rajawali.math.MathUtil;
+import rajawali.math.Matrix4;
 import rajawali.math.Number3D;
 import rajawali.math.Number3D.Axis;
 import android.opengl.Matrix;
@@ -17,12 +18,15 @@ public class Camera extends ATransformable3D {
 	protected float[] mRotateMatrixTmp = new float[16];
 	protected float[] mTmpMatrix = new float[16];
 	protected float[] mCombinedMatrix=new float[16];
+	protected float[] mInvCombinedMatrix=new float[16];
 	public Frustum mFrustum;
 	
 	protected int mFogColor = 0xdddddd;
 	protected float mFogNear = 5;
 	protected float mFogFar = 25;
 	protected boolean mFogEnabled = false;
+
+	protected boolean mUpdateManually = false;
 
 	public Camera() {
 		super();
@@ -31,7 +35,7 @@ public class Camera extends ATransformable3D {
 		mFrustum = new Frustum();
 	}
 
-	public float[] getViewMatrix() {
+	public void updateViewMatrix() {
 		if (mLookAt != null) {
 			Matrix.setLookAtM(mVMatrix, 0, -mPosition.x, mPosition.y,
 					mPosition.z, mLookAt.x, mLookAt.y, mLookAt.z, mUpAxis.x, mUpAxis.y,
@@ -39,21 +43,42 @@ public class Camera extends ATransformable3D {
 		} else {
 			if (mUseRotationMatrix == false && mRotationDirty) {
 				setOrientation();
-				mOrientation.toRotationMatrix(mRotationMatrix);
 				mRotationDirty = false;
 			}
+			mOrientation.toRotationMatrix(mRotationMatrix);
 			Matrix.setIdentityM(mTmpMatrix, 0);
 			Matrix.setIdentityM(mVMatrix, 0);
 			Matrix.translateM(mTmpMatrix, 0, mPosition.x, -mPosition.y, -mPosition.z);
 			Matrix.multiplyMM(mVMatrix, 0, mRotationMatrix, 0, mTmpMatrix, 0);
 		}
+	}
+
+	public float[] getViewMatrix() {
+		if (!mUpdateManually)
+			updateViewMatrix();
 		return mVMatrix;
+	}
+
+	public void setViewMatrix( Matrix4 mat ) {
+		System.arraycopy(mat.val(), 0, mVMatrix, 0, 16);
+	}
+
+	public void updateFrustum() {
+		Matrix.multiplyMM(mCombinedMatrix, 0, mProjMatrix, 0, mVMatrix, 0);
+		invertM(mInvCombinedMatrix, 0, mCombinedMatrix, 0);
+		mFrustum.update(mInvCombinedMatrix);
 	}
 
 	public void updateFrustum(float[] pMatrix,float[] vMatrix) {
 		Matrix.multiplyMM(mCombinedMatrix, 0, pMatrix, 0, vMatrix, 0);
-		invertM(mTmpMatrix, 0, mCombinedMatrix, 0);
-		mFrustum.update(mTmpMatrix);
+		invertM(mInvCombinedMatrix, 0, mCombinedMatrix, 0);
+		mFrustum.update(mInvCombinedMatrix);
+	}
+
+	public void updateFrustum(float[] combinedMatrix) {
+		System.arraycopy(combinedMatrix, 0, mCombinedMatrix, 0, 16);
+		invertM(mInvCombinedMatrix, 0, combinedMatrix, 0);
+		mFrustum.update(mInvCombinedMatrix);
 	}
 
 	protected void rotateM(float[] m, int mOffset, float a, float x, float y,
@@ -231,6 +256,18 @@ public class Camera extends ATransformable3D {
 		return mProjMatrix;
 	}
 
+	public float[] getCombinedMatrix() {
+		return mCombinedMatrix;
+	}
+
+	public void setCombinedMatrix(Matrix4 mat) {
+		System.arraycopy(mat.val(), 0, mCombinedMatrix, 0, 16);
+	}
+
+	public float[] getInvCombinedMatrix() {
+		return mInvCombinedMatrix;
+	}
+
 	public float getNearPlane() {
 		return mNearPlane;
 	}
@@ -293,5 +330,23 @@ public class Camera extends ATransformable3D {
 
 	public void setFogEnabled(boolean fogEnabled) {
 		this.mFogEnabled = fogEnabled;
+	}
+
+	/**
+	 * Returns whether this camera's view matrix is updated manually or not
+	 * @return state of manual updating
+	 */
+	public boolean updateManually() {
+		return mUpdateManually;
+	}
+
+	/**
+	 * Set whether or not the camera updates its view matrix every time {@link #getViewMatrix()} is called.
+	 * If updateManually is true then it is up to the user to modify the view matrix directly or to call
+	 * {@link #updateViewMatrix()} after making any changes to the camera properties.
+	 * @param updateManually desired state of manual updating
+	 */
+	public void setUpdateManually(boolean updateManually) {
+		mUpdateManually = updateManually;
 	}
 }

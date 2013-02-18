@@ -4,6 +4,12 @@ import android.graphics.Color;
 import android.opengl.GLES20;
 
 public class ToonMaterial extends DiffuseMaterial {
+	
+	public static final String UNI_TOON_COLOR0 = "uToonColor0";
+	public static final String UNI_TOON_COLOR1 = "uToonColor1";
+	public static final String UNI_TOON_COLOR2 = "uToonColor2";
+	public static final String UNI_TOON_COLOR3 = "uToonColor3";
+
 	protected static final String mFShader = 
 			"precision mediump float;\n" +
 
@@ -12,10 +18,13 @@ public class ToonMaterial extends DiffuseMaterial {
 			"varying vec4 V;\n" +
 			"varying vec4 vColor;\n" +
 	 
-			"uniform sampler2D uDiffuseTexture;\n" +
-			"uniform vec4 uAmbientColor;\n" +
-			"uniform vec4 uAmbientIntensity;\n" + 
-			"uniform vec4 uToonColor0, uToonColor1, uToonColor2, uToonColor3;\n" +
+			"uniform sampler2D " + UNI_DIFFUSE_TEX + ";\n" +
+			"uniform vec4 " + UNI_AMBIENT_COLOR + ";\n" +
+			"uniform vec4 " + UNI_AMBIENT_INTENSITY + ";\n" + 
+			"uniform vec4 " + UNI_TOON_COLOR0 + ";\n" +
+			"uniform vec4 " + UNI_TOON_COLOR1 + ";\n" +
+			"uniform vec4 " + UNI_TOON_COLOR2 + ";\n" +
+			"uniform vec4 " + UNI_TOON_COLOR3 + ";\n" +
 			
 			M_FOG_FRAGMENT_VARS +
 			"%LIGHT_VARS%" +
@@ -32,17 +41,16 @@ public class ToonMaterial extends DiffuseMaterial {
 			"#else\n" +
 			"	vec4 color = vec4(1.0);\n" +
 			"#endif\n" +
-			"   if(intensity > .95) color = uToonColor0;\n" +
-			"   else if(intensity > .5) color = uToonColor1;\n" +
-			"   else if(intensity > .25) color = uToonColor2;\n" +
-			"   else color = uToonColor3;\n" +
+			"   if(intensity > .95) color = " + UNI_TOON_COLOR0 + ";\n" +
+			"   else if(intensity > .5) color = " + UNI_TOON_COLOR1 + ";\n" +
+			"   else if(intensity > .25) color = " + UNI_TOON_COLOR2 + ";\n" +
+			"   else color = " + UNI_TOON_COLOR3 + ";\n" +
 			"	color.rgb *= intensity;\n" +	
-			"	color += uAmbientColor * uAmbientIntensity;\n" +
+			"	color += " + UNI_AMBIENT_INTENSITY + " * " + UNI_AMBIENT_COLOR + ";\n" +
 			"	gl_FragColor = color;\n" +
 			M_FOG_FRAGMENT_COLOR +	
 			"}\n";
 	
-	protected int muToonColor0Handle, muToonColor1Handle, muToonColor2Handle, muToonColor3Handle;
 	protected float[] mToonColor0, mToonColor1, mToonColor2, mToonColor3;
 	
 	public ToonMaterial() {
@@ -60,20 +68,25 @@ public class ToonMaterial extends DiffuseMaterial {
 	@Override
 	public void useProgram() {
 		super.useProgram();
-		GLES20.glUniform4fv(muToonColor0Handle, 1, mToonColor0, 0);
-		GLES20.glUniform4fv(muToonColor1Handle, 1, mToonColor1, 0);
-		GLES20.glUniform4fv(muToonColor2Handle, 1, mToonColor2, 0);
-		GLES20.glUniform4fv(muToonColor3Handle, 1, mToonColor3, 0);
+		int uni = getUniformHandle(UNI_TOON_COLOR0);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mToonColor0, 0);
+		uni = getUniformHandle(UNI_TOON_COLOR1);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mToonColor1, 0);
+		uni = getUniformHandle(UNI_TOON_COLOR2);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mToonColor2, 0);
+		uni = getUniformHandle(UNI_TOON_COLOR3);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mToonColor3, 0);
 	}
 	
 	@Override
 	public void setShaders(String vertexShader, String fragmentShader)
 	{
 		super.setShaders(vertexShader, fragmentShader);
-		muToonColor0Handle = getUniformLocation("uToonColor0");
-		muToonColor1Handle = getUniformLocation("uToonColor1");
-		muToonColor2Handle = getUniformLocation("uToonColor2");
-		muToonColor3Handle = getUniformLocation("uToonColor3");
+		registerUniforms(UNI_TOON_COLOR0, UNI_TOON_COLOR1, UNI_TOON_COLOR2, UNI_TOON_COLOR3);
 	}
 	
 	public void setToonColors(int color0, int color1, int color2, int color3) {

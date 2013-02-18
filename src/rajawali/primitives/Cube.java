@@ -39,6 +39,12 @@ public class Cube extends BaseObject3D {
                 -halfSize, halfSize, halfSize, -halfSize, halfSize,-halfSize, -halfSize,-halfSize,-halfSize, -halfSize,-halfSize, halfSize,//1-6-7-halfSize left
                 halfSize, halfSize, halfSize, halfSize, halfSize,-halfSize, -halfSize, halfSize,-halfSize, -halfSize, halfSize, halfSize, //top
                 halfSize,-halfSize, halfSize, -halfSize,-halfSize, halfSize, -halfSize,-halfSize,-halfSize, halfSize,-halfSize,-halfSize,//bottom
+//				-halfSize, halfSize, halfSize,		halfSize, halfSize, halfSize,		halfSize,-halfSize, halfSize,		-halfSize,-halfSize, halfSize, //0-1-halfSize-3 front
+//                -halfSize, halfSize, halfSize,		halfSize,-halfSize, halfSize,		-halfSize,-halfSize,-halfSize,		-halfSize, halfSize,-halfSize,//0-3-4-5 right
+//                -halfSize,-halfSize,-halfSize,		halfSize,-halfSize,-halfSize,		halfSize, halfSize,-halfSize,		-halfSize, halfSize,-halfSize,//4-7-6-5 back
+//                halfSize, halfSize, halfSize,		halfSize, halfSize,-halfSize,		halfSize,-halfSize,-halfSize,		halfSize,-halfSize, halfSize,//1-6-7-halfSize left
+//                -halfSize, halfSize, halfSize,		-halfSize, halfSize,-halfSize,		halfSize, halfSize,-halfSize,		halfSize, halfSize, halfSize, //top
+//                -halfSize,-halfSize, halfSize,		halfSize,-halfSize, halfSize,		halfSize,-halfSize,-halfSize,		-halfSize,-halfSize,-halfSize,//bottom
                 };
 		
 		float t = 1;
@@ -52,12 +58,18 @@ public class Cube extends BaseObject3D {
 				0, 1,	1, 1,  	1, 0, 	0, 0, // left
 		};
 		float[] skyboxTextureCoords = {
-				-t,t,t, t,t,t, t,-t,t, -t,-t,t,     // front
-				t,t,-t, t,-t,-t, t,-t,t, t,t,t,   // up
-				-t,-t,-t, t,-t,-t, t,t,-t, -t,t,-t, // back
-				-t,t,-t, -t,t,t, -t,-t,t,-t,-t,-t, // down
-				-t,t,t, -t,t,-t, t,t,-t, t,t,t,   // right
-				-t,-t,t, t,-t,t, t,-t,-t, -t,-t,-t,  // left
+//				-t,t,t, t,t,t, t,-t,t, -t,-t,t,     // front
+//				t,t,-t, t,-t,-t, t,-t,t, t,t,t,   // up
+//				-t,-t,-t, t,-t,-t, t,t,-t, -t,t,-t, // back
+//				-t,t,-t, -t,t,t, -t,-t,t,-t,-t,-t, // down
+//				-t,t,t, -t,t,-t, t,t,-t, t,t,t,   // right
+//				-t,-t,t, t,-t,t, t,-t,-t, -t,-t,-t,  // left
+				t,t,t,		-t,t,t,		-t,-t,t,	t,-t,t,     // front
+				-t,t,-t,	-t,-t,-t,	-t,-t,t,	-t,t,t,   // up
+				t,-t,-t,	-t,-t,-t,	-t,t,-t,	t,t,-t, // back
+				t,t,-t,		t,t,t,		t,-t,t,		t,-t,-t, // down
+				t,t,t,		t,t,-t,		-t,t,-t,	-t,t,t,   // right
+				t,-t,t,		-t,-t,t,	-t,-t,-t,	t,-t,-t,  // left
 		};
 		float[] skybox2TextureCoords = {
 				.25f, .3333f,	.5f, .3333f,  	.5f, .6666f, 	.25f, .6666f, 	// front
@@ -82,10 +94,16 @@ public class Cube extends BaseObject3D {
 		float n = 1;
 		
 		float[] normals = {
+//				0, 0, n,   0, 0, n,   0, 0, n,   0, 0, n,     //front
+//                n, 0, 0,   n, 0, 0,   n, 0, 0,   n, 0, 0,     // right
+//                0, 0,-n,   0, 0,-n,   0, 0,-n,   0, 0,-n,     //back
+//                -n, 0, 0,  -n, 0, 0,  -n, 0, 0,  -n, 0, 0,     // left
+//                0, n, 0,   0, n, 0,   0, n, 0,   0, n, 0,     //  top                          
+//                0,-n, 0,   0,-n, 0,   0,-n, 0,   0,-n, 0,     // bottom
 				0, 0, n,   0, 0, n,   0, 0, n,   0, 0, n,     //front
-                n, 0, 0,   n, 0, 0,   n, 0, 0,   n, 0, 0,     // right
+                -n, 0, 0,   -n, 0, 0,   -n, 0, 0,   -n, 0, 0,     // right
                 0, 0,-n,   0, 0,-n,   0, 0,-n,   0, 0,-n,     //back
-                -n, 0, 0,  -n, 0, 0,  -n, 0, 0,  -n, 0, 0,     // left
+                n, 0, 0,  n, 0, 0,  n, 0, 0,  n, 0, 0,     // left
                 0, n, 0,   0, n, 0,   0, n, 0,   0, n, 0,     //  top                          
                 0,-n, 0,   0,-n, 0,   0,-n, 0,   0,-n, 0,     // bottom
 		};
@@ -107,6 +125,7 @@ public class Cube extends BaseObject3D {
 				22, 21, 20, 23, 22, 20
 		};
 		
-		setData(vertices, normals, mIsSkybox ? skyboxTextureCoords : textureCoords, colors, mIsSkybox && mHasCubemapTexture ? skyboxIndices : indices);
+		setData(vertices, normals, mIsSkybox ? skyboxTextureCoords : textureCoords,
+			( mIsSkybox && mHasCubemapTexture ) ? 3 : 2, colors, mIsSkybox && mHasCubemapTexture ? skyboxIndices : indices);
 	}
 }

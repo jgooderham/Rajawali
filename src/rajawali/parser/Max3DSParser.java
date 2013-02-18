@@ -339,10 +339,13 @@ public class Max3DSParser extends AMeshParser {
 		Number3D v2 = vertices.get(vertexIDs[2]);
 		Number3D v3 = vertices.get(vertexIDs[1]);
 
-		Number3D vector1 = Number3D.subtract(v2, v1);
-		Number3D vector2 = Number3D.subtract(v3, v1);
+		Number3D vector1 = Number3D.tmp();
+		Number3D.subtract(v2, v1, vector1);
+		Number3D vector2 = Number3D.tmp2();
+		Number3D.subtract(v3, v1, vector2);
 
-		Number3D normal = Number3D.cross(vector1, vector2);
+		Number3D normal = new Number3D();
+		Number3D.cross(vector1, vector2, normal);
 		normal.normalize();
 		return normal;
 	}

@@ -2,9 +2,11 @@ package rajawali.bounds;
 
 import java.nio.FloatBuffer;
 
+import rajawali.AGeometry3D;
 import rajawali.BaseObject3D;
+import rajawali.BufferInfo;
 import rajawali.Camera;
-import rajawali.Geometry3D;
+import rajawali.materials.AMaterial;
 import rajawali.materials.SimpleMaterial;
 import rajawali.math.Number3D;
 import rajawali.primitives.Sphere;
@@ -12,7 +14,7 @@ import android.opengl.GLES20;
 import android.opengl.Matrix;
 
 public class BoundingSphere implements IBoundingVolume {
-	protected Geometry3D mGeometry;
+	protected AGeometry3D mGeometry;
 	protected float mRadius;
 	protected Number3D mPosition;
 	protected Sphere mVisualSphere;
@@ -28,7 +30,7 @@ public class BoundingSphere implements IBoundingVolume {
 		mScaleValues = new float[3];
 	}
 	
-	public BoundingSphere(Geometry3D geometry) {
+	public BoundingSphere(AGeometry3D geometry) {
 		this();
 		mGeometry = geometry;
 		calculateBounds(mGeometry);
@@ -50,13 +52,12 @@ public class BoundingSphere implements IBoundingVolume {
 		Matrix.setIdentityM(mTmpMatrix, 0);
 		mVisualSphere.setPosition(mPosition);
 		mVisualSphere.setScale(mRadius * mScale);
-		mVisualSphere.render(camera, projMatrix, vMatrix, mTmpMatrix, null);
+		mVisualSphere.render(camera, projMatrix, vMatrix, mTmpMatrix, null, null);
 	}
 	
 	public void transform(float[] matrix) {
 		mPosition.setAll(0, 0, 0);
 		mPosition.multiply(matrix);
-		mPosition.x = -mPosition.x;
 		
 		mTmpPos.setAll(matrix[0], matrix[1], matrix[2]);
 		mScaleValues[0] = mTmpPos.length();
@@ -69,12 +70,16 @@ public class BoundingSphere implements IBoundingVolume {
 		mScale = mScale > mScaleValues[2] ? mScale : mScaleValues[2];
 	}
 	
-	public void calculateBounds(Geometry3D geometry) {
+	public void calculateBounds(AGeometry3D geometry) {
 		float radius = 0, maxRadius = 0;
 		Number3D vertex = new Number3D();
-		FloatBuffer vertices = geometry.getVertices();
+		BufferInfo bufferInfo = geometry.getBuffer(AMaterial.ATTR_POSITION);
+		FloatBuffer vertices = (FloatBuffer)bufferInfo.buffer;
 		vertices.rewind();		
+		vertices.position(bufferInfo.attributeOffset);
 		
+		int stride = bufferInfo.vertexSize;
+
 		while(vertices.hasRemaining()) {
 			vertex.x = vertices.get();
 			vertex.y = vertices.get();
@@ -82,6 +87,8 @@ public class BoundingSphere implements IBoundingVolume {
 			
 			radius = vertex.length();
 			if(radius > maxRadius) maxRadius = radius;
+
+			if (stride > 0) vertices.position(Math.min(vertices.position()+stride, vertices.limit()));
 		}
 		mRadius = maxRadius;
 	}

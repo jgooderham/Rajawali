@@ -246,6 +246,8 @@ public class MD5MeshParser extends AMeshParser implements IAnimatedMeshParser {
 	}
 	
 	private void buildMeshes() {
+		Number3D rotPos = new Number3D();
+		Number3D pos = new Number3D();
 		for(int i=0; i<mNumMeshes; ++i) {
 			int boneIndex = 0;
 			MD5Mesh mesh = mMeshes[i];
@@ -262,9 +264,9 @@ public class MD5MeshParser extends AMeshParser implements IAnimatedMeshParser {
 					MD5Weight weight = mesh.weights[vert.weightIndex + k];
 					SkeletonJoint joint = mJoints[weight.jointIndex];
 					
-					Number3D rotPos = joint.getOrientation().multiply(weight.position);
+					joint.getOrientation().multiply(weight.position, rotPos);
 					
-					Number3D pos = Number3D.add(joint.getPosition(), rotPos);
+					Number3D.add(joint.getPosition(), rotPos, pos);
 					pos.multiply(weight.weightValue);
 					position.add(pos);
 					
@@ -285,6 +287,12 @@ public class MD5MeshParser extends AMeshParser implements IAnimatedMeshParser {
 	}
 	
 	private void calculateNormals() {
+		Number3D v0 = new Number3D();
+		Number3D v1 = new Number3D();
+		Number3D v2 = new Number3D();
+		Number3D a = new Number3D();
+		Number3D b = new Number3D();
+		Number3D normal = new Number3D();
 		for(int i=0; i<mNumMeshes; ++i) {
 			MD5Mesh mesh = mMeshes[i];
 			mesh.indices = new int[mesh.numTris * 3];
@@ -303,11 +311,13 @@ public class MD5MeshParser extends AMeshParser implements IAnimatedMeshParser {
 				int index13 = index1 * 3;
 				int index23 = index2 * 3;
 				
-				Number3D v0 = new Number3D(mesh.vertices[index03], mesh.vertices[index03 + 1], mesh.vertices[index03 + 2]);
-				Number3D v1 = new Number3D(mesh.vertices[index13], mesh.vertices[index13 + 1], mesh.vertices[index13 + 2]);
-				Number3D v2 = new Number3D(mesh.vertices[index23], mesh.vertices[index23 + 1], mesh.vertices[index23 + 2]);
+				v0.setAll(mesh.vertices[index03], mesh.vertices[index03 + 1], mesh.vertices[index03 + 2]);
+				v1.setAll(mesh.vertices[index13], mesh.vertices[index13 + 1], mesh.vertices[index13 + 2]);
+				v2.setAll(mesh.vertices[index23], mesh.vertices[index23 + 1], mesh.vertices[index23 + 2]);
 				
-				Number3D normal = Number3D.cross(Number3D.subtract(v2, v0), Number3D.subtract(v1, v0));
+				Number3D.subtract(v2, v0, a);
+				Number3D.subtract(v1, v0, b);
+				Number3D.cross(a, b, normal);
 				
 				mesh.verts[index0].normal.add(normal);
 				mesh.verts[index1].normal.add(normal);
@@ -318,7 +328,7 @@ public class MD5MeshParser extends AMeshParser implements IAnimatedMeshParser {
 			
 			for(int j=0; j<mesh.numVerts; ++j) {
 				MD5Vert vert = mesh.verts[j];
-				Number3D normal = vert.normal.clone();
+				normal.setAllFrom(vert.normal);
 				vert.normal.normalize();
 				
 				normal.normalize();
@@ -335,7 +345,9 @@ public class MD5MeshParser extends AMeshParser implements IAnimatedMeshParser {
 				for(int k=0; k<vert.weightElem; ++k) {
 					MD5Weight weight = mesh.weights[vert.weightIndex + k];
 					SkeletonJoint joint = mJoints[weight.jointIndex];
-					vert.normal.add(Number3D.multiply(joint.getOrientation().multiply(normal), weight.weightValue));
+					joint.getOrientation().multiply(normal, a);
+					a.multiply(weight.weightValue);
+					vert.normal.add(a);
 				}
 			}
 		}
@@ -379,7 +391,7 @@ public class MD5MeshParser extends AMeshParser implements IAnimatedMeshParser {
 			o.setData(
 					mesh.vertices, GLES20.GL_STREAM_DRAW,
 					mesh.normals, GLES20.GL_STREAM_DRAW,
-					mesh.texCoords, GLES20.GL_STATIC_DRAW,
+					mesh.texCoords, 2, GLES20.GL_STATIC_DRAW,
 					null, GLES20.GL_STATIC_DRAW,
 					mesh.indices, GLES20.GL_STATIC_DRAW
 					);			

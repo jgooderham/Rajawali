@@ -1,7 +1,5 @@
 package rajawali;
 
-import java.nio.IntBuffer;
-import java.nio.ShortBuffer;
 import java.util.ArrayList;
 import java.util.Stack;
 
@@ -11,7 +9,9 @@ import rajawali.materials.AMaterial;
 import rajawali.materials.ColorPickerMaterial;
 import rajawali.materials.TextureInfo;
 import rajawali.materials.TextureManager.TextureType;
+import rajawali.math.Intersector;
 import rajawali.math.Number3D;
+import rajawali.renderer.RajawaliRenderer.RayPickInfo;
 import rajawali.util.ObjectColorPicker.ColorPickerInfo;
 import rajawali.util.RajLog;
 import rajawali.visitors.INode;
@@ -42,7 +42,7 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 	protected AMaterial mMaterial;
 	protected Stack<ALight> mLights;
 
-	protected Geometry3D mGeometry;
+	protected AGeometry3D mGeometry;
 	protected ArrayList<BaseObject3D> mChildren;
 	protected String mName;
 
@@ -62,6 +62,7 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 
 	protected boolean mFrustumTest = false;
 	protected boolean mIsInFrustum;
+	protected boolean mPickable = false;
 
 	protected boolean mRenderChildrenAsBatch = false;
 	protected boolean mIsPartOfBatch = false;
@@ -76,7 +77,6 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 	public BaseObject3D() {
 		super();
 		mChildren = new ArrayList<BaseObject3D>();
-		mGeometry = new Geometry3D();
 		mLights = new Stack<ALight>();
 	}
 
@@ -117,9 +117,11 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 	 * @param indices
 	 *            An integer array containing face indices
 	 */
-	public void setData(BufferInfo vertexBufferInfo, BufferInfo normalBufferInfo, float[] textureCoords,
+	public void setData(BufferInfo vertexBufferInfo, BufferInfo normalBufferInfo, float[] textureCoords, int sizeTexCoords,
 			float[] colors, int[] indices) {
-		mGeometry.setData(vertexBufferInfo, normalBufferInfo, textureCoords, colors, indices);
+		Geometry3DSeparate geom = new Geometry3DSeparate();
+		geom.setData(vertexBufferInfo, normalBufferInfo, textureCoords, sizeTexCoords, colors, indices);
+		mGeometry = geom;
 		mIsContainerOnly = false;
 		mElementsBufferType = mGeometry.areOnlyShortBuffersSupported() ? GLES20.GL_UNSIGNED_SHORT
 				: GLES20.GL_UNSIGNED_INT;
@@ -133,14 +135,34 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 	 * @param normals
 	 *            A float array containing normal data
 	 * @param textureCoords
-	 *            A float array containing texture coordinates
+	 *            A float array containing texture coordinates (assumed to have 2 components)
 	 * @param colors
 	 *            A float array containing color values (rgba)
 	 * @param indices
 	 *            An integer array containing face indices
 	 */
 	public void setData(float[] vertices, float[] normals, float[] textureCoords, float[] colors, int[] indices) {
-		setData(vertices, GLES20.GL_STATIC_DRAW, normals, GLES20.GL_STATIC_DRAW, textureCoords, GLES20.GL_STATIC_DRAW,
+		setData(vertices, normals, textureCoords, 2, colors, indices);
+	}
+
+	/**
+	 * Passes the data to the Geometry3D instance. Vertex Buffer Objects (VBOs) will be created.
+	 * 
+	 * @param vertices
+	 *            A float array containing vertex data
+	 * @param normals
+	 *            A float array containing normal data
+	 * @param textureCoords
+	 *            A float array containing texture coordinates
+	 * @param sizeTexCoords
+	 *            Number of components for each texture coordinate
+	 * @param colors
+	 *            A float array containing color values (rgba)
+	 * @param indices
+	 *            An integer array containing face indices
+	 */
+	public void setData(float[] vertices, float[] normals, float[] textureCoords, int sizeTexCoords, float[] colors, int[] indices) {
+		setData(vertices, GLES20.GL_STATIC_DRAW, normals, GLES20.GL_STATIC_DRAW, textureCoords, sizeTexCoords, GLES20.GL_STATIC_DRAW,
 				colors, GLES20.GL_STATIC_DRAW, indices, GLES20.GL_STATIC_DRAW);
 	}
 
@@ -160,11 +182,33 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 		setData(ser.getVertices(), ser.getNormals(), ser.getTextureCoords(), ser.getColors(), ser.getIndices());
 	}
 
-	public void setData(float[] vertices, int verticesUsage, float[] normals, int normalsUsage, float[] textureCoords,
-			int textureCoordsUsage,
-			float[] colors, int colorsUsage, int[] indices, int indicesUsage) {
-		mGeometry.setData(vertices, verticesUsage, normals, normalsUsage, textureCoords, textureCoordsUsage, colors,
+	public void setData(float[] vertices, int verticesUsage, float[] normals, int normalsUsage, float[] textureCoords, int sizeTexCoords,
+			int textureCoordsUsage, float[] colors, int colorsUsage, int[] indices, int indicesUsage) {
+		Geometry3DSeparate geom = new Geometry3DSeparate();
+		geom.setData(vertices, verticesUsage, normals, normalsUsage, textureCoords, sizeTexCoords, textureCoordsUsage, colors,
 				colorsUsage, indices, indicesUsage);
+		mGeometry = geom;
+		mIsContainerOnly = false;
+		mElementsBufferType = mGeometry.areOnlyShortBuffersSupported() ? GLES20.GL_UNSIGNED_SHORT
+				: GLES20.GL_UNSIGNED_INT;
+	}
+
+	public void setData(float[] vertices, int[] indices, BufferInfo... bufferInfos) {
+
+		Geometry3DInterleaved geom = new Geometry3DInterleaved();
+		geom.setData(vertices, indices, bufferInfos);
+		mGeometry = geom;
+		mIsContainerOnly = false;
+		mElementsBufferType = mGeometry.areOnlyShortBuffersSupported() ? GLES20.GL_UNSIGNED_SHORT
+				: GLES20.GL_UNSIGNED_INT;
+	}
+
+	/**
+	 * Sets object data from an existing AGeometry3D object. Intended for when a more control over how AGeometry3D object is created, not as a method of cloning.
+	 * @param geom
+	 */
+	public void setData(AGeometry3D geom) {
+		mGeometry = geom;
 		mIsContainerOnly = false;
 		mElementsBufferType = mGeometry.areOnlyShortBuffersSupported() ? GLES20.GL_UNSIGNED_SHORT
 				: GLES20.GL_UNSIGNED_INT;
@@ -177,8 +221,8 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 		mGeometry.validateBuffers();
 	}
 
-	public void render(Camera camera, float[] projMatrix, float[] vMatrix, ColorPickerInfo pickerInfo) {
-		render(camera, projMatrix, vMatrix, null, pickerInfo);
+	public void render(Camera camera, float[] projMatrix, float[] vMatrix, ColorPickerInfo pickerInfo, RayPickInfo rayPickInfo) {
+		render(camera, projMatrix, vMatrix, null, pickerInfo, rayPickInfo);
 	}
 
 	/**
@@ -196,11 +240,12 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 	 *            The current color picker info. This is only used when an object is touched.
 	 */
 	public void render(Camera camera, float[] projMatrix, float[] vMatrix, final float[] parentMatrix,
-			ColorPickerInfo pickerInfo) {
+			ColorPickerInfo pickerInfo, RayPickInfo rayPickInfo) {
 		if (!mIsVisible)
 			return;
 
-		preRender();
+		if (!mIsContainerOnly)
+			preRender();
 
 		// -- move view matrix transformation first
 		Matrix.setIdentityM(mMMatrix, 0);
@@ -216,7 +261,7 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 			System.arraycopy(mLookAtMatrix, 0, mRotateMatrix, 0, 16);
 		}
 
-		Matrix.translateM(mMMatrix, 0, -mPosition.x, mPosition.y, mPosition.z);
+		Matrix.translateM(mMMatrix, 0, mPosition.x, mPosition.y, mPosition.z);
 		Matrix.setIdentityM(mTmpMatrix, 0);
 		Matrix.multiplyMM(mTmpMatrix, 0, mMMatrix, 0, mScalematrix, 0);
 		Matrix.multiplyMM(mMMatrix, 0, mTmpMatrix, 0, mRotateMatrix, 0);
@@ -228,11 +273,16 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 		Matrix.multiplyMM(mMVPMatrix, 0, projMatrix, 0, mMVPMatrix, 0);
 
 		mIsInFrustum = true; // only if mFrustrumTest == true it check frustum
-		if (mFrustumTest && mGeometry.hasBoundingBox()) {
+		if ((mFrustumTest || rayPickInfo != null) && mGeometry.hasBoundingBox()) {
 			BoundingBox bbox = mGeometry.getBoundingBox();
 			bbox.transform(mMMatrix);
-			if (!camera.mFrustum.boundsInFrustum(bbox)) {
+			if (mFrustumTest && !camera.mFrustum.boundsInFrustum(bbox)) {
 				mIsInFrustum = false;
+			}
+			if ((rayPickInfo != null) && mPickable) {
+				if (Intersector.intersectRayBoundsFast(rayPickInfo.pickRay, bbox)) {
+					rayPickInfo.pickList.add(this);
+				}
 			}
 		}
 
@@ -257,8 +307,9 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 				pickerMat.setPickingColor(mPickingColorArray);
 				pickerMat.useProgram();
 				pickerMat.setCamera(camera);
-				pickerMat.setVertices(mGeometry.getVertexBufferInfo().bufferHandle);
+				pickerMat.setBuffer(mGeometry.getBuffer(AMaterial.ATTR_POSITION));
 			} else {
+
 				if (!mIsPartOfBatch) {
 					if (mMaterial == null) {
 						RajLog.e("[" + this.getClass().getName()
@@ -269,56 +320,79 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 					mMaterial.useProgram();
 					setShaderParams(camera);
 					mMaterial.bindTextures();
-					mMaterial.setTextureCoords(mGeometry.getTexCoordBufferInfo().bufferHandle, mHasCubemapTexture);
-					mMaterial.setNormals(mGeometry.getNormalBufferInfo().bufferHandle);
 					mMaterial.setCamera(camera);
-					mMaterial.setVertices(mGeometry.getVertexBufferInfo().bufferHandle);
+					for (BufferInfo bufferInfo : mGeometry.getVertexBufferInfos()) {
+						if (bufferInfo != null) {
+							if (bufferInfo.attributeName == AMaterial.ATTR_COLOR) {
+//								if (mMaterial.getUseColor())
+									mMaterial.setBuffer(bufferInfo);
+							} else {
+								mMaterial.setBuffer(bufferInfo);
+							}
+						}
+					}
+				} else if (mMaterial != null && mMaterial.getUseColor()) {
+					BufferInfo bi = mGeometry.getBuffer(AMaterial.ATTR_COLOR);
+					if (bi != null)
+						mMaterial.setBuffer(bi);
 				}
-				if (mMaterial.getUseColor())
-					mMaterial.setColors(mGeometry.getColorBufferInfo().bufferHandle);
+				setInstanceShaderParams(camera);
 			}
 
 			GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
 
-			if (pickerInfo == null)
-			{
-				mMaterial.setMVPMatrix(mMVPMatrix);
-				mMaterial.setModelMatrix(mMMatrix);
-				mMaterial.setViewMatrix(vMatrix);
-
-				GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, mGeometry.getIndexBufferInfo().bufferHandle);
-				fix.android.opengl.GLES20.glDrawElements(mDrawingMode, mGeometry.getNumIndices(), mElementsBufferType,
-						0);
-				GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
-				if (!mIsPartOfBatch && !mRenderChildrenAsBatch) {
-					mMaterial.unbindTextures();
+			// if parent of a render batch, don't draw self just draw children
+			if (!mRenderChildrenAsBatch) {
+				if (pickerInfo == null) {
+	
+					mMaterial.setMVPMatrix(mMVPMatrix);
+					mMaterial.setModelMatrix(mMMatrix);
+					mMaterial.setViewMatrix(vMatrix);
+	
+					if (mGeometry.getNumIndices() > 0 && mGeometry.getIndexBufferInfo() != null) {
+						GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, mGeometry.getIndexBufferInfo().bufferHandle);
+						fix.android.opengl.GLES20.glDrawElements(mDrawingMode, mGeometry.getNumIndices(), mElementsBufferType,
+								0);
+						GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
+					} else {
+						GLES20.glDrawArrays(mDrawingMode, 0, mGeometry.getNumVertices());
+					}
+					if (!mIsPartOfBatch && !mRenderChildrenAsBatch) {
+						mMaterial.unbindTextures();
+					}
+				} else if (pickerInfo != null && mIsPickingEnabled) {
+					ColorPickerMaterial pickerMat = pickerInfo.getPicker().getMaterial();
+					pickerMat.setMVPMatrix(mMVPMatrix);
+					pickerMat.setModelMatrix(mMMatrix);
+					pickerMat.setViewMatrix(vMatrix);
+					
+					if (mGeometry.getNumIndices() > 0 && mGeometry.getIndexBufferInfo() != null) {
+						GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, mGeometry.getIndexBufferInfo().bufferHandle);
+						fix.android.opengl.GLES20.glDrawElements(mDrawingMode, mGeometry.getNumIndices(), mElementsBufferType,
+								0);
+						GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
+					} else {
+						GLES20.glDrawArrays(mDrawingMode, 0, mGeometry.getNumVertices());
+					}
+	
+					pickerMat.unbindTextures();
 				}
-			} else if (pickerInfo != null && mIsPickingEnabled) {
-				ColorPickerMaterial pickerMat = pickerInfo.getPicker().getMaterial();
-				pickerMat.setMVPMatrix(mMVPMatrix);
-				pickerMat.setModelMatrix(mMMatrix);
-				pickerMat.setViewMatrix(vMatrix);
-				GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, mGeometry.getIndexBufferInfo().bufferHandle);
-				fix.android.opengl.GLES20.glDrawElements(mDrawingMode, mGeometry.getNumIndices(), mElementsBufferType,
-						0);
-				GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
-
-				pickerMat.unbindTextures();
+				GLES20.glDisable(GLES20.GL_CULL_FACE);
+				GLES20.glDisable(GLES20.GL_BLEND);
+				GLES20.glDisable(GLES20.GL_DEPTH_TEST);
 			}
-			GLES20.glDisable(GLES20.GL_CULL_FACE);
-			GLES20.glDisable(GLES20.GL_BLEND);
-			GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+
+			if (mShowBoundingVolume) {
+				if (mGeometry.hasBoundingBox())
+					mGeometry.getBoundingBox().drawBoundingVolume(camera, projMatrix, vMatrix, mMMatrix);
+				if (mGeometry.hasBoundingSphere())
+					mGeometry.getBoundingSphere().drawBoundingVolume(camera, projMatrix, vMatrix, mMMatrix);
+			}
 		}
 
-		if (mShowBoundingVolume) {
-			if (mGeometry.hasBoundingBox())
-				mGeometry.getBoundingBox().drawBoundingVolume(camera, projMatrix, vMatrix, mMMatrix);
-			if (mGeometry.hasBoundingSphere())
-				mGeometry.getBoundingSphere().drawBoundingVolume(camera, projMatrix, vMatrix, mMMatrix);
-		}
 		// Draw children without frustum test
 		for (BaseObject3D child : mChildren) {
-			child.render(camera, projMatrix, vMatrix, mMMatrix, pickerInfo);
+			child.render(camera, projMatrix, vMatrix, mMMatrix, pickerInfo, rayPickInfo);
 		}
 
 		if (mRenderChildrenAsBatch) {
@@ -358,7 +432,15 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 	 */
 	protected void setShaderParams(Camera camera) {
 		mMaterial.setLightParams();
-	};
+	}
+
+	/**
+	 * This is called for every object, whether part of a batch or not. This allows uniforms to be set on a per-object basis, even if they share a material with others.
+	 * 
+	 * @param camera
+	 */
+	protected void setInstanceShaderParams(Camera camera) {
+	}
 
 	/**
 	 * Adds a texture to this object
@@ -568,7 +650,7 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 		return null;
 	}
 
-	public Geometry3D getGeometry() {
+	public AGeometry3D getGeometry() {
 		return mGeometry;
 	}
 
@@ -616,42 +698,15 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 	}
 
 	public SerializedObject3D toSerializedObject3D() {
-		SerializedObject3D ser = new SerializedObject3D(
-				mGeometry.getVertices() != null ? mGeometry.getVertices().capacity() : 0,
-				mGeometry.getNormals() != null ? mGeometry.getNormals().capacity() : 0,
-				mGeometry.getTextureCoords() != null ? mGeometry.getTextureCoords().capacity() : 0,
-				mGeometry.getColors() != null ? mGeometry.getColors().capacity() : 0,
-				mGeometry.getIndices() != null ? mGeometry.getIndices().capacity() : 0);
-
-		int i;
-
-		if (mGeometry.getVertices() != null)
-			for (i = 0; i < mGeometry.getVertices().capacity(); i++)
-				ser.getVertices()[i] = mGeometry.getVertices().get(i);
-		if (mGeometry.getNormals() != null)
-			for (i = 0; i < mGeometry.getNormals().capacity(); i++)
-				ser.getNormals()[i] = mGeometry.getNormals().get(i);
-		if (mGeometry.getTextureCoords() != null)
-			for (i = 0; i < mGeometry.getTextureCoords().capacity(); i++)
-				ser.getTextureCoords()[i] = mGeometry.getTextureCoords().get(i);
-		if (mGeometry.getColors() != null)
-			for (i = 0; i < mGeometry.getColors().capacity(); i++)
-				ser.getColors()[i] = mGeometry.getColors().get(i);
-		if (!mGeometry.areOnlyShortBuffersSupported()) {
-			IntBuffer buff = (IntBuffer) mGeometry.getIndices();
-			for (i = 0; i < mGeometry.getIndices().capacity(); i++)
-				ser.getIndices()[i] = buff.get(i);
-		} else {
-			ShortBuffer buff = (ShortBuffer) mGeometry.getIndices();
-			for (i = 0; i < mGeometry.getIndices().capacity(); i++)
-				ser.getIndices()[i] = buff.get(i);
-		}
-
-		return ser;
+		return mGeometry.toSerializedObject3D();
 	}
 
 	protected void cloneTo(BaseObject3D clone, boolean copyMaterial) {
-		clone.getGeometry().copyFromGeometry3D(mGeometry);
+		if ( mGeometry instanceof Geometry3DSeparate )
+			clone.mGeometry = new Geometry3DSeparate();
+		else if ( mGeometry instanceof Geometry3DInterleaved )
+			clone.mGeometry = new Geometry3DInterleaved();
+		clone.mGeometry.copyFromGeometry3D(mGeometry);
 		clone.isContainer(mIsContainerOnly);
 		if (copyMaterial)
 			clone.setMaterial(mMaterial, false);
@@ -728,6 +783,14 @@ public class BaseObject3D extends ATransformable3D implements Comparable<BaseObj
 
 	public boolean isInFrustum() {
 		return mIsInFrustum;
+	}
+
+	public boolean isPickable() {
+		return mPickable;
+	}
+
+	public void setIsPickable(boolean pickable) {
+		mPickable = pickable;
 	}
 
 	public boolean getRenderChildrenAsBatch()

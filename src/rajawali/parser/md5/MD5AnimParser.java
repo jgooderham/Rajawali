@@ -208,6 +208,7 @@ public class MD5AnimParser extends AParser implements IAnimationSequenceParser {
 	}
 
 	private void buildFrameSkeleton(float[] frameData, Skeleton skeleton) {
+		Number3D rotPos = Number3D.tmp();
 		for(int i=0; i<mNumJoints; ++i) {
 			SkeletonJoint joint = new SkeletonJoint(mBaseFrame[i]);
 			SkeletonJoint jointInfo = mJoints[i];
@@ -228,9 +229,9 @@ public class MD5AnimParser extends AParser implements IAnimationSequenceParser {
 			if (joint.getParentIndex() >= 0 ) // Has a parent joint
 	        {
 	            SkeletonJoint parentJoint = skeleton.getJoint(joint.getParentIndex());
-	            Number3D rotPos = parentJoint.getOrientation().multiply(joint.getPosition()).clone();
+	            parentJoint.getOrientation().multiply(joint.getPosition(), rotPos);
 	 
-	            joint.getPosition().setAllFrom(Number3D.add(parentJoint.getPosition(), rotPos));
+	            Number3D.add(parentJoint.getPosition(), rotPos, joint.getPosition());
 	            joint.getOrientation().multiply(parentJoint.getOrientation());
 	            joint.getOrientation().normalize();
 	        }

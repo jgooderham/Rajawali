@@ -3,7 +3,9 @@ package rajawali.animation.mesh;
 import java.nio.FloatBuffer;
 
 import rajawali.BaseObject3D;
+import rajawali.BufferInfo;
 import rajawali.Camera;
+import rajawali.materials.AMaterial;
 import rajawali.math.Number3D;
 import rajawali.math.Quaternion;
 import rajawali.parser.md5.MD5MeshParser.MD5Mesh;
@@ -64,8 +66,10 @@ public class BoneAnimationObject3D extends AAnimationObject3D {
 		Number3D rotPos = new Number3D();
 		int index = 0;
 		
-		FloatBuffer vBuff = mGeometry.getVertices();
-		FloatBuffer nBuff = mGeometry.getNormals();
+		BufferInfo vBufferInfo = mGeometry.getBuffer(AMaterial.ATTR_POSITION);
+		BufferInfo nBufferInfo = mGeometry.getBuffer(AMaterial.ATTR_NORMAL);
+		FloatBuffer vBuff = (FloatBuffer)vBufferInfo.buffer;
+		FloatBuffer nBuff = (FloatBuffer)nBufferInfo.buffer;
 		vBuff.clear();
 		nBuff.clear();
 		vBuff.position(0);
@@ -84,13 +88,14 @@ public class BoneAnimationObject3D extends AAnimationObject3D {
 	            MD5Weight weight = mMesh.weights[vert.weightIndex + j];
 	            SkeletonJoint joint = mSkeleton.getJoint(weight.jointIndex);
 
-	            rotPos = joint.getOrientation().multiply(weight.position);
+	            joint.getOrientation().multiply(weight.position, rotPos);
 	            
-				Number3D pos = Number3D.add(joint.getPosition(), rotPos);
+				Number3D pos = Number3D.tmp();
+				Number3D.add(joint.getPosition(), rotPos, pos);
 				pos.multiply(weight.weightValue);
 				position.add(pos);
 				
-				rotPos = joint.getOrientation().multiply(vert.normal);
+				joint.getOrientation().multiply(vert.normal, rotPos);
 				rotPos.multiply(weight.weightValue);
 	            normal.add(rotPos);
 	        }
@@ -106,9 +111,9 @@ public class BoneAnimationObject3D extends AAnimationObject3D {
 	    
 	    vBuff.position(0);
 	    nBuff.position(0);
-	    
-	    mGeometry.changeBufferData(mGeometry.getVertexBufferInfo(), vBuff, 0);
-	   mGeometry.changeBufferData(mGeometry.getNormalBufferInfo(), nBuff, 0);
+
+	    mGeometry.changeBufferData(vBufferInfo, vBuff, 0);
+	   mGeometry.changeBufferData(nBufferInfo, nBuff, 0);
 	}
 	
 	public void setNumJoints(int numJoints) {

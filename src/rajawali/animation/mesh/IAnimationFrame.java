@@ -1,10 +1,10 @@
 package rajawali.animation.mesh;
 
-import rajawali.Geometry3D;
+import rajawali.Geometry3DSeparate;
 
 public interface IAnimationFrame {
-	public Geometry3D getGeometry();
-	public void setGeometry(Geometry3D geometry);
+	public Geometry3DSeparate getGeometry();
+	public void setGeometry(Geometry3DSeparate geometry);
 	public String getName();
 	public void setName(String name);
 }

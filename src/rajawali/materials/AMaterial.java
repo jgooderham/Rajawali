@@ -1,20 +1,45 @@
 package rajawali.materials;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Stack;
 
+import rajawali.BufferInfo;
 import rajawali.Camera;
 import rajawali.lights.ALight;
 import rajawali.materials.TextureManager.TextureType;
 import rajawali.math.Number3D;
 import rajawali.renderer.RajawaliRenderer;
 import rajawali.util.RajLog;
+import rajawali.wallpaper.Wallpaper;
 import android.opengl.GLES20;
+import android.util.Log;
 
 public abstract class AMaterial {
 	public static final int NONE				= 0;
 	public static final int VERTEX_ANIMATION 	= 1 << 0;
-	
+
+	public static final String ATTR_POSITION			= "aPosition";
+	public static final String ATTR_NORMAL				= "aNormal";
+	public static final String ATTR_TEXTURECOORD		= "aTextureCoord";
+	public static final String ATTR_COLOR				= "aColor";
+	public static final String ATTR_NEXT_FRAME_POSITION	= "aNextFramePosition";
+	public static final String ATTR_NEXT_FRAME_NORMAL	= "aNextFrameNormal";
+
+	public static final String UNI_CAMERA_POSITION	= "uCameraPosition";
+	public static final String UNI_MVP_MATRIX		= "uMVPMatrix";
+	public static final String UNI_MODEL_MATRIX		= "uMMatrix";
+	public static final String UNI_VIEW_MATRIX		= "uVMatrix";
+	public static final String UNI_INTERPOATION		= "uInterpolation";
+
+	public static final String UNI_DIFFUSE_TEX		= "uDiffuseTexture";
+	public static final String UNI_NORMAL_TEX		= "uNormalTexture";
+	public static final String UNI_FRAMEBUFFER_TEX	= "uFrameBufferTexture";
+	public static final String UNI_DEPTHBUFFER_TEX	= "uDepthBufferTexture";
+	public static final String UNI_LOOKUP_TEX		= "uLookupTexture";
+	public static final String UNI_CUBEMAP_TEX		= "uCubeMapTexture";
+	public static final String UNI_SPHEREMAP_TEX	= "uSphereMapTexture";
+
 	protected String mUntouchedVertexShader;
 	protected String mUntouchedFragmentShader;
 	protected String mVertexShader;
@@ -23,18 +48,9 @@ public abstract class AMaterial {
 	protected int mProgram;
 	protected int mVShaderHandle;
 	protected int mFShaderHandle;
-	protected int maPositionHandle;
-	protected int maTextureHandle;
-	protected int maColorHandle;
-	protected int maNormalHandle;
-	protected int maNextFramePositionHandle;
-	protected int maNextFrameNormalHandle;
 
-	protected int muMVPMatrixHandle;
-	protected int muCameraPositionHandle;
-	protected int muMMatrixHandle;
-	protected int muVMatrixHandle;
-	protected int muInterpolationHandle;
+	protected final HashMap<String, Integer> mAttributes = new HashMap<String, Integer>();
+	protected final HashMap<String, Integer> mUniforms = new HashMap<String, Integer>();
 
 	protected Stack<ALight> mLights;
 	protected boolean mUseColor = false;
@@ -113,20 +129,12 @@ public abstract class AMaterial {
 		if (mProgram == 0)
 			return;
 
-		maPositionHandle = getAttribLocation("aPosition");
-		maNormalHandle = getAttribLocation("aNormal");
-		maTextureHandle = getAttribLocation("aTextureCoord");
-		maColorHandle = getAttribLocation("aColor");
-		
-		muCameraPositionHandle = getUniformLocation("uCameraPosition");
-		muMVPMatrixHandle = getUniformLocation("uMVPMatrix");
-		muMMatrixHandle = getUniformLocation("uMMatrix");
-		muVMatrixHandle = getUniformLocation("uVMatrix");
+		registerAttributes(ATTR_POSITION, ATTR_NORMAL, ATTR_TEXTURECOORD, ATTR_COLOR);
+		registerUniforms(UNI_CAMERA_POSITION, UNI_MVP_MATRIX, UNI_MODEL_MATRIX, UNI_VIEW_MATRIX);
 		
 		if(mVertexAnimationEnabled == true) {
-			maNextFramePositionHandle = getAttribLocation("aNextFramePosition");
-			maNextFrameNormalHandle = getAttribLocation("aNextFrameNormal");
-			muInterpolationHandle = getUniformLocation("uInterpolation");
+			registerAttributes(ATTR_NEXT_FRAME_POSITION, ATTR_NEXT_FRAME_NORMAL);
+			registerUniforms(UNI_INTERPOATION);
 		}
 		
 		mProgramCreated = true;
@@ -192,6 +200,42 @@ public abstract class AMaterial {
 		return GLES20.glGetAttribLocation(mProgram, name);
 	}
 	
+	public void registerUniforms( String... uniforms) {
+		for (String name : uniforms) {
+			int handle = getUniformLocation(name);
+//			if(handle == -1)
+//				Log.d(Wallpaper.TAG, "Could not get uniform location for " + name);
+//			else
+				mUniforms.put(name, handle);
+		}
+	}
+
+	public void registerAttributes( String... attributes) {
+		for (String name : attributes) {
+			int handle = getAttribLocation(name);
+//			if(handle == -1)
+//				Log.d(Wallpaper.TAG, "Could not get attribute location for " + name);
+//			else
+				mAttributes.put(name, handle);
+		}
+	}
+
+	public int getAttributeHandle(String name) {
+		Integer attr = mAttributes.get( name );
+		if (attr == null)
+			return -1;
+		else
+			return attr;
+	}
+
+	public int getUniformHandle(String name) {
+		Integer uni = mUniforms.get( name );
+		if (uni == null)
+			return -1;
+		else
+			return uni;
+	}
+
 	public void unload() {
 		GLES20.glDeleteShader(mVShaderHandle);
 		GLES20.glDeleteShader(mFShaderHandle);
@@ -272,25 +316,25 @@ public abstract class AMaterial {
 		switch (textureInfo.getTextureType()) {
 		case DIFFUSE:
 		case VIDEO_TEXTURE:
-			textureName = "uDiffuseTexture";
+			textureName = UNI_DIFFUSE_TEX;
 			break;
 		case BUMP:
-			textureName = "uNormalTexture";
+			textureName = UNI_NORMAL_TEX;
 			break;
 		case FRAME_BUFFER:
-			textureName = "uFrameBufferTexture";
+			textureName = UNI_FRAMEBUFFER_TEX;
 			break;
 		case DEPTH_BUFFER:
-			textureName = "uDepthBufferTexture";
+			textureName = UNI_DEPTHBUFFER_TEX;
 			break;
 		case LOOKUP:
-			textureName = "uLookupTexture";
+			textureName = UNI_LOOKUP_TEX;
 			break;
 		case CUBE_MAP:
-			textureName = "uCubeMapTexture";
+			textureName = UNI_CUBEMAP_TEX;
 			break;
 		case SPHERE_MAP:
-			textureName = "uSphereMapTexture";
+			textureName = UNI_SPHEREMAP_TEX;
 			break;
 		}
 
@@ -341,12 +385,24 @@ public abstract class AMaterial {
 		}
 	}
 	
+	public void setBuffer(final BufferInfo bufferInfo) {
+		if(checkValidHandle(bufferInfo.bufferHandle, "vertex data: " + bufferInfo.attributeName)){
+			GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, bufferInfo.bufferHandle);
+			Integer attr = mAttributes.get( bufferInfo.attributeName );
+			if (attr == null)
+				RajLog.e("[" +getClass().getCanonicalName()+ "] Missing material attribute: "+bufferInfo.attributeName);
+			GLES20.glEnableVertexAttribArray(attr);
+			fix.android.opengl.GLES20.glVertexAttribPointer(attr, bufferInfo.attributeSize, bufferInfo.packed ? GLES20.GL_UNSIGNED_BYTE : GLES20.GL_FLOAT,
+					false, bufferInfo.vertexSize, bufferInfo.attributeOffset);
+		}
+	}
+
 	public void setVertices(final int vertexBufferHandle) {
 		if(checkValidHandle(vertexBufferHandle, "vertex data")){
 			GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vertexBufferHandle);
-			GLES20.glEnableVertexAttribArray(maPositionHandle);
-			fix.android.opengl.GLES20.glVertexAttribPointer(maPositionHandle, 3, GLES20.GL_FLOAT,
-					false, 0, 0);
+			int attr = mAttributes.get( ATTR_POSITION );
+			GLES20.glEnableVertexAttribArray(attr);
+			fix.android.opengl.GLES20.glVertexAttribPointer(attr, 3, GLES20.GL_FLOAT, false, 0, 0);
 		}
 	}
 
@@ -360,9 +416,9 @@ public abstract class AMaterial {
 		if(checkValidHandle(textureCoordBufferHandle, "texture coordinates"))
 		{
 			GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, textureCoordBufferHandle);
-			GLES20.glEnableVertexAttribArray(maTextureHandle);
-			fix.android.opengl.GLES20.glVertexAttribPointer(maTextureHandle,
-					hasCubemapTexture ? 3 : 2, GLES20.GL_FLOAT, false, 0, 0);
+			int attr = mAttributes.get( ATTR_TEXTURECOORD );
+			GLES20.glEnableVertexAttribArray(attr);
+			fix.android.opengl.GLES20.glVertexAttribPointer(attr, hasCubemapTexture ? 3 : 2, GLES20.GL_FLOAT, false, 0, 0);
 		}
 	}
 
@@ -370,63 +426,68 @@ public abstract class AMaterial {
 		if(checkValidHandle(colorBufferHandle, "color data"))
 		{
 			GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, colorBufferHandle);
-			GLES20.glEnableVertexAttribArray(maColorHandle);
-			fix.android.opengl.GLES20.glVertexAttribPointer(maColorHandle, 4, GLES20.GL_FLOAT,
-					false, 0, 0);
+			int attr = mAttributes.get( ATTR_COLOR );
+			GLES20.glEnableVertexAttribArray(attr);
+			// TODO: check for packed colors here..
+			fix.android.opengl.GLES20.glVertexAttribPointer(attr, 4, GLES20.GL_FLOAT, false, 0, 0);
 		}
 	}
 
 	public void setNormals(final int normalBufferHandle) {
-		if(checkValidHandle(normalBufferHandle, "normal data"))
-			if(checkValidHandle(maNormalHandle, null)){
-			GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, normalBufferHandle);
-			GLES20.glEnableVertexAttribArray(maNormalHandle);
-			fix.android.opengl.GLES20.glVertexAttribPointer(maNormalHandle, 3, GLES20.GL_FLOAT,
-					false, 0, 0);
+		if(checkValidHandle(normalBufferHandle, "normal data")) {
+			int attr = mAttributes.get( ATTR_NORMAL );
+			if(checkValidHandle(attr, null)) {
+				GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, normalBufferHandle);
+				GLES20.glEnableVertexAttribArray(attr);
+				fix.android.opengl.GLES20.glVertexAttribPointer(attr, 3, GLES20.GL_FLOAT, false, 0, 0);
+			}
 		}
 	}
 
 	public void setMVPMatrix(float[] mvpMatrix) {
-		if(checkValidHandle(muMVPMatrixHandle, "mvp matrix"))
-			GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mvpMatrix, 0);
-
+		int uni = getUniformHandle( UNI_MVP_MATRIX );
+		if(checkValidHandle(uni, null))//"mvp matrix"))
+			GLES20.glUniformMatrix4fv(uni, 1, false, mvpMatrix, 0);
 	}
 
 	public void setModelMatrix(float[] modelMatrix) {
 		mModelViewMatrix = modelMatrix;
-		if(checkValidHandle(muMMatrixHandle, null))
-			GLES20.glUniformMatrix4fv(muMMatrixHandle, 1, false, modelMatrix, 0);
+		int uni = getUniformHandle( UNI_MODEL_MATRIX );
+		if(checkValidHandle(uni, null))
+			GLES20.glUniformMatrix4fv(uni, 1, false, modelMatrix, 0);
 	}
 
 	public void setViewMatrix(float[] viewMatrix) {
 		mViewMatrix = viewMatrix;
-		if(checkValidHandle(muVMatrixHandle, null))
-			GLES20.glUniformMatrix4fv(muVMatrixHandle, 1, false, viewMatrix, 0);
+		int uni = getUniformHandle( UNI_VIEW_MATRIX );
+		if(checkValidHandle(uni, null))
+			GLES20.glUniformMatrix4fv(uni, 1, false, viewMatrix, 0);
 	}
 	
 	public void setInterpolation(float interpolation) {
-		if(checkValidHandle(muInterpolationHandle, "interpolation"))
-			GLES20.glUniform1f(muInterpolationHandle, interpolation);
+		int uni = getUniformHandle( UNI_INTERPOATION );
+		if(checkValidHandle(uni, "interpolation"))
+			GLES20.glUniform1f(uni, interpolation);
 	}
 	
 	public void setNextFrameVertices(final int vertexBufferHandle) {
 		if(checkValidHandle(vertexBufferHandle, "NextFrameVertices")){
-			if(checkValidHandle(maNextFramePositionHandle, "maNextFramePositionHandle")){
+			int attr = mAttributes.get( ATTR_NEXT_FRAME_POSITION );
+			if(checkValidHandle(attr, "maNextFramePositionHandle")){
 				GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vertexBufferHandle);
-				GLES20.glEnableVertexAttribArray(maNextFramePositionHandle);
-				fix.android.opengl.GLES20.glVertexAttribPointer(maNextFramePositionHandle, 3, GLES20.GL_FLOAT,
-						false, 0, 0);
+				GLES20.glEnableVertexAttribArray(attr);
+				fix.android.opengl.GLES20.glVertexAttribPointer(attr, 3, GLES20.GL_FLOAT, false, 0, 0);
 			}
 		}
 	}
 	
 	public void setNextFrameNormals(final int normalBufferHandle) {
 		if(checkValidHandle(normalBufferHandle, "NextFrameNormals")){
-			if(checkValidHandle(maNextFrameNormalHandle, "maNextFrameNormalHandle")){
+			int attr = mAttributes.get( ATTR_NEXT_FRAME_NORMAL );
+			if(checkValidHandle(attr, "maNextFrameNormalHandle")){
 				GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, normalBufferHandle);
-				GLES20.glEnableVertexAttribArray(maNextFrameNormalHandle);
-				fix.android.opengl.GLES20.glVertexAttribPointer(maNextFrameNormalHandle, 3, GLES20.GL_FLOAT,
-						false, 0, 0);
+				GLES20.glEnableVertexAttribArray(attr);
+				fix.android.opengl.GLES20.glVertexAttribPointer(attr, 3, GLES20.GL_FLOAT, false, 0, 0);
 			}
 		}
 	}
@@ -460,8 +521,9 @@ public abstract class AMaterial {
 		mCameraPosArray[0] = camPos.x;
 		mCameraPosArray[1] = camPos.y;
 		mCameraPosArray[2] = camPos.z;
-		if (muCameraPositionHandle > -1)
-			GLES20.glUniform3fv(muCameraPositionHandle, 1, mCameraPosArray, 0);
+		int uni = getUniformHandle( UNI_CAMERA_POSITION );
+		if (uni > -1)
+			GLES20.glUniform3fv(uni, 1, mCameraPosArray, 0);
 	}
 
 	public String toString() {

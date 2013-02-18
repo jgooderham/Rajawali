@@ -4,18 +4,21 @@ import rajawali.lights.ALight;
 import android.opengl.GLES20;
 
 public class SphereMapMaterial extends AAdvancedMaterial {
+
+	public static final String UNI_SPHEREMAP_STRENGTH = "uSphereMapStrength";
+
 	protected static final String mVShader = 
 		"precision mediump float;\n" +
 
-		"uniform mat4 uMVPMatrix;\n" +
-		"uniform mat4 uMMatrix;\n" +
-		"uniform mat3 uNMatrix;\n" +
-		"uniform vec3 uLightPos;\n" +
-		"uniform vec3 uCameraPosition;\n" +
-		"attribute vec4 aPosition;\n" +
-		"attribute vec2 aTextureCoord;\n" +
-		"attribute vec3 aNormal;\n" +
-		"attribute vec4 aColor;\n" +
+		"uniform mat4 " + UNI_MVP_MATRIX + ";\n" +
+		"uniform mat4 " + UNI_MODEL_MATRIX + ";\n" +
+		"uniform mat3 " + UNI_NORMAL_MATRIX + ";\n" +
+//		"uniform vec3 uLightPos;\n" +
+		"uniform vec3 " + UNI_CAMERA_POSITION + ";\n" +
+		"attribute vec4 " + ATTR_POSITION + ";\n" +
+		"attribute vec2 " + ATTR_TEXTURECOORD + ";\n" +
+		"attribute vec3 " + ATTR_NORMAL + ";\n" +
+		"attribute vec4 " + ATTR_COLOR + ";\n" +
 		"varying vec2 vTextureCoord;\n" +
 		"varying vec2 vReflectTextureCoord;\n" +
 		"varying vec3 vReflectDir;\n" +
@@ -29,18 +32,18 @@ public class SphereMapMaterial extends AAdvancedMaterial {
 		
 		"void main() {\n" +
 		"	float dist = 0.0;\n" +
-		"	gl_Position = uMVPMatrix * aPosition;\n" +
-		"	V = uMMatrix * aPosition;\n" +
-		"	vec3 eyeDir = normalize(V.xyz - uCameraPosition.xyz);\n" +
-		"	N = normalize(uNMatrix * aNormal);\n" +
+		"	gl_Position = " + UNI_MVP_MATRIX + " * " + ATTR_POSITION + ";\n" +
+		"	V = uMMatrix * " + ATTR_POSITION + ";\n" +
+		"	vec3 eyeDir = normalize(V.xyz - " + UNI_CAMERA_POSITION + ".xyz);\n" +
+		"	N = normalize(" + UNI_NORMAL_MATRIX + " * " + ATTR_NORMAL + ");\n" +
 		"	vReflectDir = reflect(eyeDir, N);\n" +
 		"	float m = 2.0 * sqrt(vReflectDir.x*vReflectDir.x + vReflectDir.y*vReflectDir.y + (vReflectDir.z+1.0)*(vReflectDir.z+1.0));\n" +
-		"	vTextureCoord = aTextureCoord;\n" +
+		"	vTextureCoord = " + ATTR_TEXTURECOORD + ";\n" +
 		"	vReflectTextureCoord.s = vReflectDir.x/m + 0.5;\n" +
 		"	vReflectTextureCoord.t = vReflectDir.y/m + 0.5;\n" +
-		"	vNormal = aNormal;\n" +
+		"	vNormal = " + ATTR_NORMAL + ";\n" +
 		"#ifndef TEXTURED\n" +
-		"	vColor = aColor;\n" +
+		"	vColor = " + ATTR_COLOR + ";\n" +
 		"#endif\n" +
 		"%LIGHT_CODE%" +
 		M_FOG_VERTEX_DENSITY +
@@ -49,11 +52,11 @@ public class SphereMapMaterial extends AAdvancedMaterial {
 	protected static final String mFShader = 
 		"precision mediump float;\n" +
 
-		"uniform sampler2D uDiffuseTexture;\n" +
-		"uniform sampler2D uSphereMapTexture;\n" +
-		"uniform vec4 uAmbientColor;\n" +
-		"uniform vec4 uAmbientIntensity;\n" +
-		"uniform float uSphereMapStrength;\n" +
+		"uniform sampler2D " + UNI_DIFFUSE_TEX + ";\n" +
+		"uniform sampler2D " + UNI_SPHEREMAP_TEX + ";\n" +
+		"uniform vec4 " + UNI_AMBIENT_COLOR + ";\n" +
+		"uniform vec4 " + UNI_AMBIENT_INTENSITY + ";\n" +
+		"uniform float " + UNI_SPHEREMAP_STRENGTH + ";\n" +
 
 		"varying vec2 vReflectTextureCoord;\n" +
 		"varying vec2 vTextureCoord;\n" +
@@ -69,19 +72,17 @@ public class SphereMapMaterial extends AAdvancedMaterial {
 		"void main() {\n" +
 		"	float intensity = 0.0;\n" +
 		"%LIGHT_CODE%" +
-		"	vec4 reflColor = texture2D(uSphereMapTexture, vReflectTextureCoord);\n" +
+		"	vec4 reflColor = texture2D(" + UNI_SPHEREMAP_TEX + ", vReflectTextureCoord);\n" +
 		"#ifdef TEXTURED\n" +		
-		"	vec4 diffColor = texture2D(uDiffuseTexture, vTextureCoord);\n" +
+		"	vec4 diffColor = texture2D(" + UNI_DIFFUSE_TEX + ", vTextureCoord);\n" +
 		"#else\n" +
 	    "	vec4 diffColor = vColor;\n" +
 	    "#endif\n" +
-		"	gl_FragColor = diffColor + reflColor * uSphereMapStrength;\n" +
-		"	gl_FragColor += uAmbientColor * uAmbientIntensity;" +
+		"	gl_FragColor = diffColor + reflColor * " + UNI_SPHEREMAP_STRENGTH + ";\n" +
+		"	gl_FragColor += " + UNI_AMBIENT_INTENSITY + " * " + UNI_AMBIENT_COLOR + ";" +
 		"	gl_FragColor.rgb *= intensity;\n" +
 		M_FOG_FRAGMENT_COLOR +	
 		"}\n";
-	
-	private int muSphereMapStrengthHandle;
 	
 	private float mSphereMapStrength = .4f;
 	
@@ -92,7 +93,9 @@ public class SphereMapMaterial extends AAdvancedMaterial {
 	@Override
 	public void useProgram() {
 		super.useProgram();
-		GLES20.glUniform1f(muSphereMapStrengthHandle, mSphereMapStrength);
+		int uni = getUniformHandle(UNI_SPHEREMAP_STRENGTH);
+		if (uni > -1)
+			GLES20.glUniform1f(uni, mSphereMapStrength);
 	}
 	
 	public void setShaders(String vertexShader, String fragmentShader) {
@@ -105,19 +108,19 @@ public class SphereMapMaterial extends AAdvancedMaterial {
 			ALight light = mLights.get(i);
 			
 			if(light.getLightType() == ALight.POINT_LIGHT) {
-				sb.append("L = normalize(uLightPosition").append(i).append(" - V.xyz);\n");
-				vc.append("dist = distance(V.xyz, uLightPosition").append(i).append(");\n");
-				vc.append("vAttenuation").append(i).append(" = 1.0 / (uLightAttenuation").append(i).append("[1] + uLightAttenuation").append(i).append("[2] * dist + uLightAttenuation").append(i).append("[3] * dist * dist);\n");
+				sb.append("L = normalize(").append(UNI_LIGHT_POSITION).append(i).append(" - V.xyz);\n");
+				vc.append("dist = distance(V.xyz, ").append(UNI_LIGHT_POSITION).append(i).append(");\n");
+				vc.append("vAttenuation").append(i).append(" = 1.0 / (").append(UNI_LIGHT_ATTENUATION).append(i).append("[1] + ").append(UNI_LIGHT_ATTENUATION).append(i).append("[2] * dist + ").append(UNI_LIGHT_ATTENUATION).append(i).append("[3] * dist * dist);\n");
 			} else if(light.getLightType() == ALight.DIRECTIONAL_LIGHT) {
 				vc.append("vAttenuation").append(i).append(" = 1.0;\n");
-				sb.append("L = -normalize(uLightDirection").append(i).append(");");				
+				sb.append("L = -normalize(").append(UNI_LIGHT_DIRECTION).append(i).append(");");				
 			}
-			sb.append("intensity += uLightPower").append(i).append(" * max(dot(N, L), 0.1) * vAttenuation").append(i).append(";\n");
+			sb.append("intensity += ").append(UNI_LIGHT_POWER).append(i).append(" * max(dot(N, L), 0.1) * vAttenuation").append(i).append(";\n");
 		}
 		
 		super.setShaders(vertexShader.replace("%LIGHT_CODE%", vc.toString()), fragmentShader.replace("%LIGHT_CODE%", sb.toString()));
-		
-		muSphereMapStrengthHandle = getUniformLocation("uSphereMapStrength");
+
+		registerUniforms(UNI_SPHEREMAP_STRENGTH);
 	}
 
 	public float getSphereMapStrength() {

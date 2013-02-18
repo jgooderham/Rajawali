@@ -6,20 +6,24 @@ import android.opengl.GLES20;
 
 
 public class GouraudMaterial extends AAdvancedMaterial {
+
+	public static final String UNI_SPECULAR_COLOR		= "uSpecularColor";
+	public static final String UNI_SPECULAR_INTENSITY	= "uSpecularIntensity";
+
 	protected static final String mVShader = 
 		"precision mediump float;\n" +
 
-		"uniform mat4 uMVPMatrix;\n" +
-		"uniform mat3 uNMatrix;\n" +
-		"uniform mat4 uMMatrix;\n" +
-		"uniform mat4 uVMatrix;\n" +
-		"uniform vec4 uAmbientColor;\n" +
-		"uniform vec4 uAmbientIntensity;\n" +
+		"uniform mat4 " + UNI_MVP_MATRIX + ";\n" +
+		"uniform mat3 " + UNI_NORMAL_MATRIX + ";\n" +
+		"uniform mat4 " + UNI_MODEL_MATRIX + ";\n" +
+		"uniform mat4 " + UNI_VIEW_MATRIX + ";\n" +
+		"uniform vec4 " + UNI_AMBIENT_COLOR + ";\n" +
+		"uniform vec4 " + UNI_AMBIENT_INTENSITY + ";\n" +
 		
-		"attribute vec4 aPosition;\n" +
-		"attribute vec3 aNormal;\n" +
-		"attribute vec2 aTextureCoord;\n" +
-		"attribute vec4 aColor;\n" +
+		"attribute vec4 " + ATTR_POSITION + ";\n" +
+		"attribute vec3 " + ATTR_NORMAL + ";\n" +
+		"attribute vec2 " + ATTR_TEXTURECOORD + ";\n" +
+		"attribute vec4 " + ATTR_COLOR + ";\n" +
 		
 		"varying vec2 vTextureCoord;\n" +
 		"varying float vSpecularIntensity;\n" +
@@ -30,24 +34,26 @@ public class GouraudMaterial extends AAdvancedMaterial {
 		"%LIGHT_VARS%" +
 		
 		"\n#ifdef VERTEX_ANIM\n" +
-		"attribute vec4 aNextFramePosition;\n" +
-		"attribute vec3 aNextFrameNormal;\n" +
-		"uniform float uInterpolation;\n" +
+		"attribute vec4 " + ATTR_NEXT_FRAME_POSITION + ";\n" +
+		"attribute vec3 " + ATTR_NEXT_FRAME_NORMAL + ";\n" +
+		"uniform float " + UNI_INTERPOATION + ";\n" +
 		"#endif\n\n" +
 		
 		"void main() {\n" +
-		"	vec4 position = aPosition;\n" +
-		"	vec3 normal = aNormal;\n" +
+		"	vSpecularIntensity = 0.0;\n" +
+		"	vDiffuseIntensity = 0.0;\n" +
+		"	vec4 position = " + ATTR_POSITION + ";\n" +
+		"	vec3 normal = " + ATTR_NORMAL + ";\n" +
 		"	#ifdef VERTEX_ANIM\n" +
-		"	position = aPosition + uInterpolation * (aNextFramePosition - aPosition);\n" +
-		"	normal = aNormal + uInterpolation * (aNextFrameNormal - aNormal);\n" +
+		"	position = " + ATTR_POSITION + " + " + UNI_INTERPOATION + " * (" + ATTR_NEXT_FRAME_POSITION + " - " + ATTR_POSITION + ");\n" +
+		"	normal = " + ATTR_NORMAL + " + " + UNI_INTERPOATION + " * (" + ATTR_NEXT_FRAME_NORMAL + " - " + ATTR_NORMAL + ");\n" +
 		"	#endif\n" +
 		
-		"	gl_Position = uMVPMatrix * position;\n" +
-		"	vTextureCoord = aTextureCoord;\n" +
+		"	gl_Position = " + UNI_MVP_MATRIX + " * position;\n" +
+		"	vTextureCoord = " + ATTR_TEXTURECOORD + ";\n" +
 		
-		"	vec3 E = -vec3(uMMatrix * position);\n" +
-		"	vec3 N = normalize(uNMatrix * normal);\n" +
+		"	vec3 E = -vec3(" + UNI_MODEL_MATRIX + " * position);\n" +
+		"	vec3 N = normalize(" + UNI_NORMAL_MATRIX + " * normal);\n" +
 		"	vec3 L = vec3(0.0);\n" +
 		"	float dist = 0.0;\n" +
 		"	float attenuation = 1.0;\n" +
@@ -56,7 +62,7 @@ public class GouraudMaterial extends AAdvancedMaterial {
 		"%LIGHT_CODE%" +
 		"	vSpecularIntensity = clamp(vSpecularIntensity, 0.0, 1.0);\n" +
 		"#ifndef TEXTURED\n" +
-		"	vColor = aColor;\n" +
+		"	vColor = " + ATTR_COLOR + ";\n" +
 		"#endif\n" +
 		M_FOG_VERTEX_DENSITY +
 		"}";
@@ -64,34 +70,32 @@ public class GouraudMaterial extends AAdvancedMaterial {
 	protected static final String mFShader = 
 		"precision mediump float;\n" +
 
+		"uniform sampler2D " + UNI_DIFFUSE_TEX + ";\n" +
+		"uniform vec4 " + UNI_AMBIENT_COLOR + ";\n" +
+		"uniform vec4 " + UNI_AMBIENT_INTENSITY + ";\n" + 
+		"uniform vec4 " + UNI_SPECULAR_COLOR + ";\n" +
+		"uniform vec4 " + UNI_SPECULAR_INTENSITY + ";\n" +
+		
 		"varying vec2 vTextureCoord;\n" +
 		"varying float vSpecularIntensity;\n" +
 		"varying float vDiffuseIntensity;\n" +
 		"varying vec4 vColor;\n" +
-		
-		"uniform sampler2D uDiffuseTexture;\n" +
-		"uniform vec4 uAmbientColor;\n" +
-		"uniform vec4 uAmbientIntensity;\n" + 
-		"uniform vec4 uSpecularColor;\n" +
-		"uniform vec4 uSpecularIntensity;\n" +
 		
 		M_FOG_FRAGMENT_VARS +	
 		"%LIGHT_VARS%" +
 		
 		"void main() {\n" +
 		"#ifdef TEXTURED\n" +
-		"	vec4 texColor = texture2D(uDiffuseTexture, vTextureCoord);\n" +
+		"	vec4 texColor = texture2D(" + UNI_DIFFUSE_TEX + ", vTextureCoord);\n" +
 		"#else\n" +
 	    "	vec4 texColor = vColor;\n" +
 	    "#endif\n" +
-		"	gl_FragColor = texColor * vDiffuseIntensity + uSpecularColor * vSpecularIntensity * uSpecularIntensity;\n" +
+		"	gl_FragColor = texColor * vDiffuseIntensity + " + UNI_SPECULAR_COLOR + " * vSpecularIntensity * " + UNI_SPECULAR_INTENSITY + ";\n" +
 		"	gl_FragColor.a = texColor.a;\n" +
-		"	gl_FragColor += uAmbientColor * uAmbientIntensity;\n" +
+		"	gl_FragColor += " + UNI_AMBIENT_INTENSITY + " * " + UNI_AMBIENT_COLOR + ";\n" +
 		M_FOG_FRAGMENT_COLOR +
 		"}";
 	
-	protected int muSpecularColorHandle;
-	protected int muSpecularIntensityHandle;
 	protected float[] mSpecularColor;
 	protected float[] mSpecularIntensity;
 	
@@ -113,8 +117,12 @@ public class GouraudMaterial extends AAdvancedMaterial {
 	@Override
 	public void useProgram() {
 		super.useProgram();
-		GLES20.glUniform4fv(muSpecularColorHandle, 1, mSpecularColor, 0);
-		GLES20.glUniform4fv(muSpecularIntensityHandle, 1, mSpecularIntensity, 0);
+		int uni = getUniformHandle(UNI_SPECULAR_COLOR);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mSpecularColor, 0);
+		uni = getUniformHandle(UNI_SPECULAR_INTENSITY);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mSpecularIntensity, 0);
 	}
 	
 	public void setSpecularColor(float[] color) {
@@ -145,25 +153,27 @@ public class GouraudMaterial extends AAdvancedMaterial {
 	
 	public void setShaders(String vertexShader, String fragmentShader)
 	{
+System.out.println("gouraud setShaders ***************");		
 		StringBuffer sb = new StringBuffer();
-		
+
 		for(int i=0; i<mLights.size(); ++i) {
 			ALight light = mLights.get(i);
 
 			if(light.getLightType() == ALight.POINT_LIGHT) {
-				sb.append("L = normalize(uLightPosition").append(i).append(" + E);\n");
-				sb.append("dist = distance(-E, uLightPosition").append(i).append(");\n");
-				sb.append("attenuation = 1.0 / (uLightAttenuation").append(i).append("[1] + uLightAttenuation").append(i).append("[2] * dist + uLightAttenuation").append(i).append("[3] * dist * dist);\n");
+				sb.append("L = normalize(").append(UNI_LIGHT_POSITION).append(i).append(" + E);\n");
+				sb.append("dist = distance(-E, ").append(UNI_LIGHT_POSITION).append(i).append(");\n");
+				sb.append("attenuation = 1.0 / (").append(UNI_LIGHT_ATTENUATION).append(i).append("[1] + ").append(UNI_LIGHT_ATTENUATION).append(i).append("[2] * dist + ").append(UNI_LIGHT_ATTENUATION).append(i).append("[3] * dist * dist);\n");
 			} else if(light.getLightType() == ALight.DIRECTIONAL_LIGHT) {
-				sb.append("L = normalize(-uLightDirection").append(i).append(");");
+				sb.append("L = normalize(-").append(UNI_LIGHT_DIRECTION).append(i).append(");\n");
 			}
 			sb.append("NdotL = max(dot(N, L), 0.1);\n");
-			sb.append("vDiffuseIntensity += NdotL * attenuation * uLightPower").append(i).append(";\n");
-			sb.append("vSpecularIntensity += pow(NdotL, 6.0) * attenuation * uLightPower").append(i).append(";\n");
+			sb.append("vDiffuseIntensity += NdotL * attenuation * ").append(UNI_LIGHT_POWER).append(i).append(";\n");
+			sb.append("vSpecularIntensity += pow(NdotL, 6.0) * attenuation * ").append(UNI_LIGHT_POWER).append(i).append(";\n");
 		}
-		
+System.out.println("gouraud material *****************");
 		super.setShaders(vertexShader.replace("%LIGHT_CODE%", sb.toString()), fragmentShader);
-		muSpecularColorHandle = getUniformLocation("uSpecularColor");
-		muSpecularIntensityHandle = getUniformLocation("uSpecularIntensity");
+
+		registerUniforms(UNI_SPECULAR_COLOR, UNI_SPECULAR_INTENSITY);
+System.out.println("gouraud material *****************");		
 	}
 }

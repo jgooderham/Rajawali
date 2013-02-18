@@ -32,8 +32,8 @@ public class ChaseCamera extends Camera {
 		mPosition.setAllFrom(mCameraOffset);
 
 		mTmpOr.setAllFrom(mObjectToChase.getOrientation());
-		mPosition.setAllFrom(mTmpOr.multiply(mCameraOffset));
-		mPosition.x *= -1;
+		mTmpOr.multiply(mCameraOffset, mPosition);
+//		mPosition.x *= -1;
 		mPosition.add(mObjectToChase.getPosition());
 		mTmpOr.inverseSelf();
 		mOrientation.setAllFrom(Quaternion.slerp(mSlerpFactor, mOrientation, mTmpOr, true));

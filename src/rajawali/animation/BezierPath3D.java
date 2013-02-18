@@ -13,6 +13,8 @@ public class BezierPath3D implements ISpline {
 	private boolean mCalculateTangents;
 	private Number3D mCurrentTangent;
 
+	private static Number3D tmpVec = new Number3D();
+
 	public BezierPath3D() {
 		mPoints = new Stack<CubicBezier3D>();
 		mCurrentTangent = new Number3D();
@@ -27,22 +29,23 @@ public class BezierPath3D implements ISpline {
 		addPoint(new CubicBezier3D(p0, p1, p2, p3));
 	}
 
-	public Number3D calculatePoint(float t) {
+	public void calculatePoint(float t, Number3D result) {
 
 		if(mCalculateTangents) {
 			float prevt = t == 0 ? t + DELTA : t - DELTA;
 			float nextt = t == 1 ? t - DELTA : t + DELTA;
-			mCurrentTangent = p(prevt);
-			Number3D nextp = p(nextt);
+			p(prevt, mCurrentTangent);
+			Number3D nextp = Number3D.tmp();
+			p(nextt, nextp);
 			mCurrentTangent.subtract(nextp);
 			mCurrentTangent.multiply(.5f);
 			mCurrentTangent.normalize();
 		}
 		
-		return p(t);
+		p(t, result);
 	}
 	
-	protected Number3D p(float t) {
+	protected void p(float t, Number3D result) {
 		int currentIndex = (int) FloatMath.floor((t == 1 ? t - .000001f : t) * mNumPoints);
 
 		CubicBezier3D currentPoint = mPoints.get(currentIndex);
@@ -54,13 +57,14 @@ public class BezierPath3D implements ISpline {
 		float ttt = tt * tdivnum;
 		float uuu = uu * u;
 
-		Number3D p = Number3D.multiply(currentPoint.p0, uuu);
+		Number3D.multiply(currentPoint.p0, uuu, result);
 
-		p.add(Number3D.multiply(currentPoint.p1, 3 * uu * tdivnum));
-		p.add(Number3D.multiply(currentPoint.p2, 3 * u * tt));
-		p.add(Number3D.multiply(currentPoint.p3, ttt));
-		
-		return p;
+		Number3D.multiply(currentPoint.p1, 3 * uu * tdivnum, tmpVec);
+		result.add(tmpVec);
+		Number3D.multiply(currentPoint.p2, 3 * u * tt, tmpVec);
+		result.add(tmpVec);
+		Number3D.multiply(currentPoint.p3, ttt, tmpVec);
+		result.add(tmpVec);
 	}
 
 	public class CubicBezier3D {
@@ -78,8 +82,8 @@ public class BezierPath3D implements ISpline {
 
 	}
 
-	public Number3D getCurrentTangent() {
-		return mCurrentTangent;
+	public void getCurrentTangent(Number3D result) {
+		result.setAllFrom(mCurrentTangent);
 	}
 
 	public void setCalculateTangents(boolean calculateTangents) {

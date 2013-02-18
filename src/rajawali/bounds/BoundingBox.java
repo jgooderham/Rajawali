@@ -2,9 +2,11 @@ package rajawali.bounds;
 
 import java.nio.FloatBuffer;
 
+import rajawali.AGeometry3D;
 import rajawali.BaseObject3D;
+import rajawali.BufferInfo;
 import rajawali.Camera;
-import rajawali.Geometry3D;
+import rajawali.materials.AMaterial;
 import rajawali.materials.SimpleMaterial;
 import rajawali.math.Number3D;
 import rajawali.primitives.Cube;
@@ -12,9 +14,10 @@ import android.opengl.GLES20;
 import android.opengl.Matrix;
 
 public class BoundingBox implements IBoundingVolume {
-	protected Geometry3D mGeometry;
+	protected AGeometry3D mGeometry;
 	protected Number3D mMin, mTransformedMin;
 	protected Number3D mMax, mTransformedMax;
+	protected Number3D mCenter, mTransformedCenter;
 	protected Number3D mTmpMin, mTmpMax;
 	protected Number3D[] mPoints;
 	protected Number3D[] mTmp;
@@ -57,6 +60,8 @@ public class BoundingBox implements IBoundingVolume {
 		mTmp = new Number3D[8];
 		mMin = new Number3D();
 		mMax = new Number3D();
+		mCenter = new Number3D();
+		mTransformedCenter = new Number3D();
 		for(int i=0; i<8; ++i) {
 			mPoints[i] = new Number3D();
 			mTmp[i] = new Number3D();
@@ -83,10 +88,10 @@ public class BoundingBox implements IBoundingVolume {
 				mTransformedMin.y + (mTransformedMax.y - mTransformedMin.y) * .5f, 
 				mTransformedMin.z + (mTransformedMax.z - mTransformedMin.z) * .5f
 				);
-		mVisualBox.render(camera, projMatrix, vMatrix, mTmpMatrix, null);
+		mVisualBox.render(camera, projMatrix, vMatrix, mTmpMatrix, null, null);
 	}
 	
-	public BoundingBox(Geometry3D geometry) {
+	public BoundingBox(AGeometry3D geometry) {
 		this();
 		mGeometry = geometry;
 		calculateBounds(mGeometry);
@@ -96,15 +101,18 @@ public class BoundingBox implements IBoundingVolume {
 		return mVisualBox;
 	}
 	
-	public void calculateBounds(Geometry3D geometry) {
-		FloatBuffer vertices = geometry.getVertices();
+	public void calculateBounds(AGeometry3D geometry) {
+		BufferInfo bufferInfo = geometry.getBuffer(AMaterial.ATTR_POSITION);
+		FloatBuffer vertices = (FloatBuffer)bufferInfo.buffer;
 		vertices.rewind();
+		vertices.position(bufferInfo.attributeOffset);
 		
 		mMin = new Number3D(Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
 		mMax = new Number3D(-Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE);
 		
+		int stride = bufferInfo.vertexSize;
+
 		Number3D vertex = new Number3D();
-		
 		while(vertices.hasRemaining()) {
 			vertex.x = vertices.get();
 			vertex.y = vertices.get();
@@ -116,7 +124,10 @@ public class BoundingBox implements IBoundingVolume {
 			if(vertex.x > mMax.x) mMax.x = vertex.x;
 			if(vertex.y > mMax.y) mMax.y = vertex.y;
 			if(vertex.z > mMax.z) mMax.z = vertex.z;
+
+			if (stride > 0) vertices.position(Math.min(vertices.position()+stride, vertices.limit()));
 		}
+		mCenter.setAll(0.5f * (mMin.x + mMax.x), 0.5f * (mMin.y + mMax.y), 0.5f * (mMin.z + mMax.z));
 		
 		// -- bottom plane
 		// -- -x, -y, -z
@@ -148,7 +159,6 @@ public class BoundingBox implements IBoundingVolume {
 			Number3D d = mTmp[mI];
 			d.setAllFrom(o);
 			d.multiply(matrix);
-			d.x = -d.x;
 			
 			if(d.x < mTransformedMin.x) mTransformedMin.x = d.x;
 			if(d.y < mTransformedMin.y) mTransformedMin.y = d.y;
@@ -157,6 +167,9 @@ public class BoundingBox implements IBoundingVolume {
 			if(d.y > mTransformedMax.y) mTransformedMax.y = d.y;
 			if(d.z > mTransformedMax.z) mTransformedMax.z = d.z;
 		}
+		mTransformedCenter.setAll(	0.5f * (mTransformedMin.x + mTransformedMax.x),
+									0.5f * (mTransformedMin.y + mTransformedMax.y),
+									0.5f * (mTransformedMin.z + mTransformedMax.z));
 	}
 	
 	public Number3D getMin() {
@@ -183,6 +196,14 @@ public class BoundingBox implements IBoundingVolume {
 		return mTransformedMax;
 	}
 	
+	public Number3D getCenter()	 {
+		return mCenter;
+	}
+
+	public Number3D getTransformedCenter() {
+		return mTransformedCenter;
+	}
+
 	public boolean intersectsWith(IBoundingVolume boundingVolume) {
 		if(!(boundingVolume instanceof BoundingBox)) return false;
 		BoundingBox boundingBox = (BoundingBox)boundingVolume;
@@ -191,7 +212,7 @@ public class BoundingBox implements IBoundingVolume {
 		Number3D min = mTransformedMin;
 		Number3D max = mTransformedMax;		
 		
-		return (min.x < otherMax.x) && (max.x > otherMin.x) &&
+		return	(min.x < otherMax.x) && (max.x > otherMin.x) &&
 				(min.y < otherMax.y) && (max.y > otherMin.y) &&
 				(min.z < otherMax.z) && (max.z > otherMin.z);
 	}

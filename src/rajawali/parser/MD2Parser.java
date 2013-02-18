@@ -14,6 +14,7 @@ import rajawali.animation.mesh.AAnimationObject3D;
 import rajawali.animation.mesh.IAnimationFrame;
 import rajawali.animation.mesh.VertexAnimationFrame;
 import rajawali.animation.mesh.VertexAnimationObject3D;
+import rajawali.materials.AMaterial;
 import rajawali.materials.DiffuseMaterial;
 import rajawali.materials.TextureManager;
 import rajawali.renderer.RajawaliRenderer;
@@ -90,8 +91,8 @@ public class MD2Parser extends AMeshParser implements IAnimatedMeshParser {
 
 			IAnimationFrame firstFrame = mFrames.get(0);
 			mObject.getGeometry().copyFromGeometry3D(firstFrame.getGeometry());
-			mObject.setData(firstFrame.getGeometry().getVertexBufferInfo(), firstFrame.getGeometry()
-					.getNormalBufferInfo(), mTextureCoords, null, mIndices);
+			mObject.setData(firstFrame.getGeometry().getBuffer(AMaterial.ATTR_POSITION), firstFrame.getGeometry()
+					.getBuffer(AMaterial.ATTR_NORMAL), mTextureCoords, 2, null, mIndices);
 			mObject.setMaterial(new DiffuseMaterial(true));
 			mObject.setColor(0xffffffff);
 			if (mTexture != null)

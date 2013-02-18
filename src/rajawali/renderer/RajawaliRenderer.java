@@ -1,5 +1,7 @@
 package rajawali.renderer;
 
+import java.nio.Buffer;
+import java.util.ArrayList;
 import java.util.Stack;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -8,14 +10,17 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 import rajawali.BaseObject3D;
+import rajawali.BufferInfo;
 import rajawali.Camera;
 import rajawali.animation.TimerManager;
 import rajawali.filters.IPostProcessingFilter;
+import rajawali.materials.AMaterial;
 import rajawali.materials.SimpleMaterial;
 import rajawali.materials.SkyboxMaterial;
 import rajawali.materials.TextureInfo;
 import rajawali.materials.TextureManager;
 import rajawali.math.Number3D;
+import rajawali.math.Ray;
 import rajawali.primitives.Cube;
 import rajawali.util.FPSUpdateListener;
 import rajawali.util.ObjectColorPicker.ColorPickerInfo;
@@ -30,7 +35,6 @@ import android.graphics.Color;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLU;
-import android.opengl.Matrix;
 import android.service.wallpaper.WallpaperService;
 import android.view.MotionEvent;
 import android.view.WindowManager;
@@ -40,7 +44,7 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 
 	protected Context mContext;
 
-	protected float mEyeZ = -4.0f;
+	protected float mEyeZ = 4.0f;
 	protected float mFrameRate;
 	protected double mLastMeasuredFPS;
 	protected FPSUpdateListener mFPSUpdateListener;
@@ -61,6 +65,9 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 
 	protected TextureManager mTextureManager;
 	protected PostProcessingRenderer mPostProcessingRenderer;
+
+	protected RayPickInfo mRayPickInfo = new RayPickInfo();
+	private boolean doPickRay = false;
 
 	/**
 	 * Deprecated. Use setSceneCachingEnabled(false) instead.
@@ -91,7 +98,7 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 	 * is re-activated or when a live wallpaper is rotated. 
 	 */
 	private boolean mSceneCachingEnabled;
-	
+
 	public RajawaliRenderer(Context context) {
 		mContext = context;
 		mChildren = new Stack<BaseObject3D>();
@@ -178,7 +185,7 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 			GLES20.glDepthMask(false);
 
 			mSkybox.setPosition(mCamera.getX(), mCamera.getY(), mCamera.getZ());
-			mSkybox.render(mCamera, mPMatrix, mVMatrix, pickerInfo);
+			mSkybox.render(mCamera, mPMatrix, mVMatrix, pickerInfo, null);
 
 			if (mEnableDepthBuffer) {
 				GLES20.glEnable(GLES20.GL_DEPTH_TEST);
@@ -188,10 +195,13 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 
         mCamera.updateFrustum(mPMatrix,mVMatrix); //update frustum plane
         
-        synchronized (mChildren) {
-        	for (BaseObject3D child : mChildren) {
-        		child.render(mCamera, mPMatrix, mVMatrix, pickerInfo);
-        	}
+		synchronized (mChildren) {
+			if ( doPickRay )
+				mRayPickInfo.pickList.clear();
+			for (BaseObject3D child : mChildren) {
+				child.render(mCamera, mPMatrix, mVMatrix, pickerInfo, doPickRay ? mRayPickInfo : null);
+			}
+			doPickRay = false;
 		}
 		
 		if (pickerInfo != null) {
@@ -331,29 +341,63 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 		}
 	}
 	
-	public Number3D unProject(float x, float y, float z) {
-		x = mViewportWidth - x;
-		y = mViewportHeight - y;
-		
-		float[] m = new float[16], mvpmatrix = new float[16],
-			    in = new float[4],
-			    out = new float[4];
-		
-		Matrix.multiplyMM(mvpmatrix, 0, mPMatrix, 0, mVMatrix, 0);
-		Matrix.invertM(m, 0, mvpmatrix, 0);
+//	public void unproject(Number3D point) {
+//		float x = mViewportWidth - point.x;
+//		float y = mViewportHeight - point.y;
+//		
+//		float[] m = new float[16], mvpmatrix = new float[16],
+//			    in = new float[4],
+//			    out = new float[4];
+//		
+//		Matrix.multiplyMM(mvpmatrix, 0, mPMatrix, 0, mVMatrix, 0);
+//		Matrix.invertM(m, 0, mvpmatrix, 0);
+//
+//	    in[0] = (x / (float)mViewportWidth) * 2 - 1;
+//	    in[1] = (y / (float)mViewportHeight) * 2 - 1;
+//	    in[2] = 2 * point.z - 1;
+//	    in[3] = 1;
+//
+//	    Matrix.multiplyMV(out, 0, m, 0, in, 0);
+//
+//	    if (out[3]==0)
+//	        return;
+//
+//	    out[3] = 1/out[3];
+//	    point.setAll(out[0] * out[3], out[1] * out[3], out[2] * out[3]);
+//	}
 
-	    in[0] = (x / (float)mViewportWidth) * 2 - 1;
-	    in[1] = (y / (float)mViewportHeight) * 2 - 1;
-	    in[2] = 2 * z - 1;
-	    in[3] = 1;
+	/**
+	 * Un-projects a point from viewport coordinates to world-space using the camera's view matrix.
+	 * @param point the point in viewport pixel coordinates with the x/y coordinates as received from touch input
+	 *  and the z coordinate in a normalized range from 0..1 (near plane to far plane)
+	 */
+	public void unproject(Number3D point) {
 
-	    Matrix.multiplyMV(out, 0, m, 0, in, 0);
+		float x = point.x, y = point.y;
+		y = mViewportHeight - y - 1;
+		point.x = (2 * x) / mViewportWidth - 1;
+		point.y = (2 * y) / mViewportHeight - 1;
+		point.z = 2 * point.z - 1;
+		point.project(mCamera.getInvCombinedMatrix());
+	}
 
-	    if (out[3]==0)
-	        return null;
+	/**
+	 * Tell renderer to perform a ray-pick next frame using the supplied coordinates. Use {@link #getPickedChildren()} to retrieve the list of 
+	 * objects which intersected the pick ray for the last rendered frame.
+	 * @param x		the x-coordinate in screen pixels, as returned by <a href="http://developer.android.com/reference/android/view/MotionEvent.html#getX()">MotionEvent.getX()</a>
+	 * @param y		the y-coordinate in screen pixels, as returned by <a href="http://developer.android.com/reference/android/view/MotionEvent.html#getY()">MotionEvent.getY()</a>
+	 */
+	public void pickRay(float x, float y) {
+		mRayPickInfo.setPickRay(x, y);
+		doPickRay = true;
+	}
 
-	    out[3] = 1/out[3];
-	    return new Number3D(out[0] * out[3], out[1] * out[3], out[2] * out[3]);
+	/**
+	 * Retrieve the list of children which intersected the pick-ray last time it was set. This will be cleared before each new pick request.
+	 * @return		the list of children which were picked
+	 */
+	public ArrayList<BaseObject3D> getPickedChildren() {
+		return mRayPickInfo.pickList;
 	}
 
 	public float getFrameRate() {
@@ -556,9 +600,31 @@ public class RajawaliRenderer implements GLSurfaceView.Renderer, INode {
 	public int getNumTriangles() {
 		int triangleCount = 0;
 		for (BaseObject3D child : mChildren) {
-			if (child.getGeometry() != null && child.getGeometry().getVertices() != null && child.isVisible())
-				triangleCount += child.getGeometry().getVertices().limit() / 9;
+			Buffer buffer;
+			if (child.getGeometry() != null && child.isVisible()) {
+				BufferInfo bufferInfo = child.getGeometry().getBuffer(AMaterial.ATTR_POSITION);
+				if(bufferInfo != null) {
+					buffer = bufferInfo.buffer;
+					if (buffer != null)
+						triangleCount += buffer.limit() / (3 * ( bufferInfo.vertexSize > 0 ? bufferInfo.vertexSize : 3 ));
+				}
+			}
 		}
 		return triangleCount;
+	}
+
+	public class RayPickInfo {
+
+		public ArrayList<BaseObject3D> pickList = new ArrayList<BaseObject3D>();
+		public final Ray pickRay = new Ray(new Number3D(), new Number3D());
+
+		public void setPickRay(float x, float y) {
+			pickRay.origin.setAll(x, y, 0);
+			unproject(pickRay.origin);
+			pickRay.direction.setAll(x, y, 1);
+			unproject(pickRay.direction);
+			pickRay.direction.subtract(pickRay.origin);
+			pickRay.direction.normalize();
+		}
 	}
 }

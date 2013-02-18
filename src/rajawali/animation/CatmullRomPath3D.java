@@ -3,7 +3,6 @@ package rajawali.animation;
 import java.util.Stack;
 
 import rajawali.math.Number3D;
-import android.util.FloatMath;
 
 /**
  * Derived from http://www.cse.unsw.edu.au/~lambert/splines/source.html
@@ -41,22 +40,23 @@ public class CatmullRomPath3D implements ISpline {
 		return mPoints.get(index);
 	}
 
-	public Number3D calculatePoint(float t) {
+	public void calculatePoint(float t, Number3D result) {
 		if(mCalculateTangents) {
 			float prevt = t == 0 ? t + DELTA : t - DELTA;
 			float nextt = t == 1 ? t - DELTA : t + DELTA;
-			mCurrentTangent = p(prevt);
-			Number3D nextp = p(nextt);
+			p(prevt, mCurrentTangent);
+			Number3D nextp = Number3D.tmp();
+			p(nextt, nextp);
 			mCurrentTangent.subtract(nextp);
 			mCurrentTangent.multiply(.5f);
 			mCurrentTangent.normalize();
 		}
 		
-		return p(t);
+		p(t, result);
 	}
 
-	protected Number3D p(float t) {
-		int currentIndex = 2 + (int)FloatMath.floor((t == 1 ? t - DELTA : t) * (mNumPoints-3));
+	protected void p(float t, Number3D result) {
+		int currentIndex = 2 + (int)Math.floor((t == 1 ? t - DELTA : t) * (mNumPoints-3));
 		float tdivnum = (t * (mNumPoints - 3)) - (currentIndex - 2);
 		mCurrentPoint.setAll(0, 0, 0);
 		
@@ -68,7 +68,7 @@ public class CatmullRomPath3D implements ISpline {
 			mCurrentPoint.y += b * p.y;
 			mCurrentPoint.z += b * p.z;
 		}
-		return mCurrentPoint.clone();
+		result.setAllFrom(mCurrentPoint);
 	}
 
 	protected float b(int i, float t) {
@@ -85,8 +85,8 @@ public class CatmullRomPath3D implements ISpline {
 		return 0;
 	}
 	
-	public Number3D getCurrentTangent() {
-		return mCurrentTangent;
+	public void getCurrentTangent(Number3D result) {
+		result.setAllFrom(mCurrentTangent);
 	}
 
 	public int selectPoint(Number3D point) {

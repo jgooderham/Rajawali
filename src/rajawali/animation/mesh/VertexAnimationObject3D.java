@@ -3,8 +3,9 @@ package rajawali.animation.mesh;
 import android.os.SystemClock;
 
 import rajawali.Camera;
-import rajawali.Geometry3D;
+import rajawali.AGeometry3D;
 import rajawali.SerializedObject3D;
+import rajawali.materials.AMaterial;
 
 public class VertexAnimationObject3D extends AAnimationObject3D {
 
@@ -53,14 +54,14 @@ public class VertexAnimationObject3D extends AAnimationObject3D {
 		}
 
 		// Update geometry (if current frame is different from before)
-		Geometry3D currentGeometry = ((VertexAnimationFrame) mFrames.get(mCurrentFrameIndex)).getGeometry();
-		if (mGeometry.getVertexBufferInfo() != currentGeometry.getVertexBufferInfo()) {
-			mGeometry.setVertexBufferInfo(currentGeometry.getVertexBufferInfo());
-			mGeometry.setNormalBufferInfo(currentGeometry.getNormalBufferInfo());
+		AGeometry3D currentGeometry = ((VertexAnimationFrame) mFrames.get(mCurrentFrameIndex)).getGeometry();
+		if (mGeometry.getBuffer(AMaterial.ATTR_POSITION) != currentGeometry.getBuffer(AMaterial.ATTR_POSITION)) {
+			mGeometry.registerBuffer(currentGeometry.getBuffer(AMaterial.ATTR_POSITION));
+			mGeometry.registerBuffer(currentGeometry.getBuffer(AMaterial.ATTR_NORMAL));
 		}
 
 		// Find geometry for next frame in sequence
-		Geometry3D nextGeometry = currentGeometry;
+		AGeometry3D nextGeometry = currentGeometry;
 		int nextFrame = mCurrentFrameIndex + 1;
 		if (nextFrame > mEndFrameIndex) {
 			if (mLoop) {
@@ -75,8 +76,8 @@ public class VertexAnimationObject3D extends AAnimationObject3D {
 
 		// Set shader parameters
 		mMaterial.setInterpolation(mInterpolation);
-		mMaterial.setNextFrameVertices(nextGeometry.getVertexBufferInfo().bufferHandle);
-		mMaterial.setNextFrameNormals(nextGeometry.getNormalBufferInfo().bufferHandle);
+		mMaterial.setNextFrameVertices(nextGeometry.getBuffer(AMaterial.ATTR_POSITION).bufferHandle);
+		mMaterial.setNextFrameNormals(nextGeometry.getBuffer(AMaterial.ATTR_NORMAL).bufferHandle);
 
 		mStartTime = now;
 	}

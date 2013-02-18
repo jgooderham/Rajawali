@@ -33,7 +33,7 @@ public class RotateAnimation3D extends Animation3D {
 		mQuat = new Quaternion();
 		mQuatFrom = new Quaternion();
 		mQuatFrom.fromAngleAxis(rotateFrom, axis);
-		mRotationAxis = axis;
+		mRotationAxis = new Number3D(axis);
 		mRotateFrom = rotateFrom;
 		mDegreesToRotate = degreesToRotate;
 	}

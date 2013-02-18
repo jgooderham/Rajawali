@@ -13,30 +13,45 @@ import android.opengl.GLES20;
 
 public abstract class AAdvancedMaterial extends AMaterial {
 	protected static final int MAX_LIGHTS = RajawaliRenderer.getMaxLights(); 
-	
+
+	public static final String UNI_NORMAL_MATRIX		= "uNMatrix";
+	public static final String UNI_AMBIENT_COLOR		= "uAmbientColor";
+	public static final String UNI_AMBIENT_INTENSITY	= "uAmbientIntensity";
+
+	public static final String UNI_FOG_COLOR			= "uFogColor";
+	public static final String UNI_FOG_NEAR				= "uFogNear";
+	public static final String UNI_FOG_FAR				= "uFogFar";
+	public static final String UNI_FOG_ENABLED			= "uFogEnabled";
+
+	public static final String UNI_LIGHT_COLOR			= "uLightColor";
+	public static final String UNI_LIGHT_POWER			= "uLightPower";
+	public static final String UNI_LIGHT_POSITION		= "uLightPosition";
+	public static final String UNI_LIGHT_DIRECTION		= "uLightDirection";
+	public static final String UNI_LIGHT_ATTENUATION	= "uLightAttenuation";
+
 	public static final String M_FOG_VERTEX_VARS =
 			"\n#ifdef FOG_ENABLED\n" +
-			"	uniform float uFogNear;\n" +
-			"	uniform float uFogFar;\n" +
-			"	uniform bool uFogEnabled;\n" +
+			"	uniform float " + UNI_FOG_NEAR + ";\n" +
+			"	uniform float " + UNI_FOG_FAR + ";\n" +
+			"	uniform bool " + UNI_FOG_ENABLED + ";\n" +
 			"	varying float vFogDensity;\n" +
 			"#endif\n";
 	public static final String M_FOG_VERTEX_DENSITY = 
 			"\n#ifdef FOG_ENABLED\n" +
 			"	vFogDensity = 0.0;\n" +
-			"	if (uFogEnabled == true){\n" +
-			"		vFogDensity = (gl_Position.z - uFogNear) / (uFogFar - uFogNear);\n" +
+			"	if (" + UNI_FOG_ENABLED + " == true){\n" +
+			"		vFogDensity = (gl_Position.z - " + UNI_FOG_NEAR + ") / (" + UNI_FOG_FAR + " - " + UNI_FOG_NEAR + ");\n" +
 			"		vFogDensity = clamp(vFogDensity, 0.0, 1.0);\n" +
 			"	}\n" +
 			"#endif\n";
 	public static final String M_FOG_FRAGMENT_VARS =
 			"\n#ifdef FOG_ENABLED\n" +
-			"	uniform vec3 uFogColor;\n" +
+			"	uniform vec3 " + UNI_FOG_COLOR + ";\n" +
 			"	varying float vFogDensity;\n" +
 			"#endif\n";
 	public static final String M_FOG_FRAGMENT_COLOR =
 			"\n#ifdef FOG_ENABLED\n" +
-			"	gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, vFogDensity);\n" +
+			"	gl_FragColor.rgb = mix(gl_FragColor.rgb, " + UNI_FOG_COLOR + ", vFogDensity);\n" +
 			"#endif\n";
 
 	/**
@@ -52,19 +67,6 @@ public abstract class AAdvancedMaterial extends AMaterial {
 	@Deprecated
 	public static final String M_FOG_FRAGMENT_CALC = "";
 
-	protected int muNormalMatrixHandle;
-	protected int muAmbientColorHandle;
-	protected int muAmbientIntensityHandle;
-	protected int muFogColorHandle;
-	protected int muFogNearHandle;
-	protected int muFogFarHandle;
-	protected int muFogEnabledHandle;
-	protected int[] muLightColorHandles;
-	protected int[] muLightPowerHandles;
-	protected int[] muLightPositionHandles;
-	protected int[] muLightDirectionHandles; 
-	protected int[] muLightAttenuationHandles;
-		
 	protected float[] mNormalMatrix;
 	protected float[] mTmp, mTmp2;
 	protected float[] mAmbientColor, mAmbientIntensity;
@@ -122,15 +124,27 @@ public abstract class AAdvancedMaterial extends AMaterial {
 	
 	@Override
 	public void setLightParams() {
+		int uni;
 		for(int i=0; i<mLights.size(); ++i) {
 			ALight light = mLights.get(i);
-			GLES20.glUniform3fv(muLightColorHandles[i], 1, light.getColor(), 0);
-			GLES20.glUniform1f(muLightPowerHandles[i], light.getPower());
-			GLES20.glUniform3fv(muLightPositionHandles[i], 1, light.getPositionArray(), 0);
-			if(light.getLightType() == ALight.DIRECTIONAL_LIGHT)
-				GLES20.glUniform3fv(muLightDirectionHandles[i], 1, ((DirectionalLight)light).getDirection(), 0);
-			else
-				GLES20.glUniform4fv(muLightAttenuationHandles[i], 1, ((PointLight)light).getAttenuation(), 0);
+			uni = getUniformHandle(UNI_LIGHT_COLOR+i);
+			if (uni > -1)
+				GLES20.glUniform3fv(uni, 1, light.getColor(), 0);
+			uni = getUniformHandle(UNI_LIGHT_POWER+i);
+			if (uni > -1)
+				GLES20.glUniform1f(uni, light.getPower());
+			uni = getUniformHandle(UNI_LIGHT_POSITION+i);
+			if (uni > -1)
+				GLES20.glUniform3fv(uni, 1, light.getPositionArray(), 0);
+			if(light.getLightType() == ALight.DIRECTIONAL_LIGHT) {
+				uni = getUniformHandle(UNI_LIGHT_DIRECTION+i);
+				if (uni > -1)
+					GLES20.glUniform3fv(uni, 1, ((DirectionalLight)light).getDirection(), 0);
+			} else {
+				uni = getUniformHandle(UNI_LIGHT_ATTENUATION+i);
+				if (uni > -1)
+					GLES20.glUniform4fv(uni, 1, ((PointLight)light).getAttenuation(), 0);
+			}
 		}
 	}
 	
@@ -186,13 +200,30 @@ public abstract class AAdvancedMaterial extends AMaterial {
 	@Override
 	public void useProgram() {
 		super.useProgram();
-		GLES20.glUniform4fv(muAmbientColorHandle, 1, mAmbientColor, 0);
-		GLES20.glUniform4fv(muAmbientIntensityHandle, 1, mAmbientIntensity, 0);
+
+		int uni = getUniformHandle(UNI_AMBIENT_COLOR);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mAmbientColor, 0);
+		uni = getUniformHandle(UNI_AMBIENT_INTENSITY);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mAmbientIntensity, 0);
+
 		if(mFogEnabled) {
-			GLES20.glUniform3fv(muFogColorHandle, 1, mFogColor, 0);
-			GLES20.glUniform1f(muFogNearHandle, mFogNear);
-			GLES20.glUniform1f(muFogFarHandle, mFogFar);
-			GLES20.glUniform1i(muFogEnabledHandle, mFogEnabled == true ? GLES20.GL_TRUE : GLES20.GL_FALSE);
+			uni = getUniformHandle(UNI_FOG_COLOR);
+			if (uni > -1)
+				GLES20.glUniform3fv(uni, 1, mFogColor, 0);
+
+			uni = getUniformHandle(UNI_FOG_NEAR);
+			if (uni > -1)
+				GLES20.glUniform1f(uni, mFogNear);
+
+			uni = getUniformHandle(UNI_FOG_FAR);
+			if (uni > -1)
+				GLES20.glUniform1f(uni, mFogFar);
+
+			uni = getUniformHandle(UNI_FOG_ENABLED);
+			if (uni > -1)
+				GLES20.glUniform1i(uni, mFogEnabled == true ? GLES20.GL_TRUE : GLES20.GL_FALSE);
 		}
 	}
 	
@@ -216,41 +247,29 @@ public abstract class AAdvancedMaterial extends AMaterial {
 		int numLights = mLights.size();
 		
 		for(int i=0; i<numLights; ++i) {
-			lightVars.append("uniform vec3 uLightColor").append(i).append(";\n");
-			lightVars.append("uniform float uLightPower").append(i).append(";\n");
+			lightVars.append("uniform vec3 ").append(UNI_LIGHT_COLOR).append(i).append(";\n");
+			lightVars.append("uniform float ").append(UNI_LIGHT_POWER).append(i).append(";\n");
 			lightVars.append("uniform int uLightType").append(i).append(";\n");
-			lightVars.append("uniform vec3 uLightPosition").append(i).append(";\n");
-			lightVars.append("uniform vec3 uLightDirection").append(i).append(";\n");
-			lightVars.append("uniform vec4 uLightAttenuation").append(i).append(";\n");
+			lightVars.append("uniform vec3 ").append(UNI_LIGHT_POSITION).append(i).append(";\n");
+			lightVars.append("uniform vec3 ").append(UNI_LIGHT_DIRECTION).append(i).append(";\n");
+			lightVars.append("uniform vec4 ").append(UNI_LIGHT_ATTENUATION).append(i).append(";\n");
 			lightVars.append("varying float vAttenuation").append(i).append(";\n");
 		}
 		vertexShader = vertexShader.replace("%LIGHT_VARS%", lightVars.toString());
 		fragmentShader = fragmentShader.replace("%LIGHT_VARS%", lightVars.toString());
-		
+System.out.println(vertexShader);
+System.out.println("\n**********************\n\n");
+System.out.println(fragmentShader);
 		super.setShaders(vertexShader, fragmentShader);
-		muNormalMatrixHandle = getUniformLocation("uNMatrix");
-		muAmbientColorHandle = getUniformLocation("uAmbientColor");
-		muAmbientIntensityHandle = getUniformLocation("uAmbientIntensity");
-		
-		muLightAttenuationHandles = new int[numLights];
-		muLightColorHandles = new int[numLights];
-		muLightDirectionHandles = new int[numLights];
-		muLightPositionHandles = new int[numLights];
-		muLightPowerHandles = new int[numLights];
+
+		registerUniforms(UNI_NORMAL_MATRIX, UNI_AMBIENT_COLOR, UNI_AMBIENT_INTENSITY);
 		
 		for(int i=0; i<mLights.size(); ++i) {
-			muLightColorHandles[i] 			= getUniformLocation("uLightColor" + i);
-			muLightPowerHandles[i] 			= getUniformLocation("uLightPower" + i);
-			muLightPositionHandles[i] 		= getUniformLocation("uLightPosition" + i);
-			muLightDirectionHandles[i] 		= getUniformLocation("uLightDirection" + i);
-			muLightAttenuationHandles[i] 	= getUniformLocation("uLightAttenuation" + i);
+			registerUniforms(UNI_LIGHT_COLOR+i, UNI_LIGHT_POWER+i, UNI_LIGHT_POSITION+i, UNI_LIGHT_DIRECTION+i, UNI_LIGHT_ATTENUATION+i);
 		}
 		
 		if(RajawaliRenderer.isFogEnabled()) {
-			muFogColorHandle = getUniformLocation("uFogColor");
-			muFogNearHandle = getUniformLocation("uFogNear");
-			muFogFarHandle = getUniformLocation("uFogFar");
-			muFogEnabledHandle = getUniformLocation("uFogEnabled");
+			registerUniforms(UNI_FOG_COLOR, UNI_FOG_NEAR, UNI_FOG_FAR, UNI_FOG_ENABLED);
 		}
 	}
 	
@@ -274,17 +293,13 @@ public abstract class AAdvancedMaterial extends AMaterial {
 		mTmpNormalMatrix.setValues(mTmp2);
 		mTmpNormalMatrix.getValues(mNormalMatrix);
 
-	    GLES20.glUniformMatrix3fv(muNormalMatrixHandle, 1, false, mNormalMatrix, 0);
+		int uni = getUniformHandle(UNI_NORMAL_MATRIX);
+		if (uni > -1)
+			GLES20.glUniformMatrix3fv(uni, 1, false, mNormalMatrix, 0);
 	}
 	
 	public void destroy() {
 		super.destroy();
-		muLightAttenuationHandles = null;
-		muLightColorHandles = null;
-		muLightPowerHandles = null;
-		muLightPositionHandles = null;
-		muLightDirectionHandles = null;
-		muLightAttenuationHandles = null;
 		mNormalMatrix = null;
 		mTmp = null;
 		mTmp2 = null;

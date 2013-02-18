@@ -7,7 +7,10 @@ import rajawali.visitors.RayPickingVisitor;
 public class RayPicker implements IObjectPicker {
 	private RajawaliRenderer mRenderer;
 	private OnObjectPickedListener mObjectPickedListener;
-	
+
+	private static Number3D pointNear = new Number3D();
+	private static Number3D pointFar = new Number3D();
+
 	public RayPicker(RajawaliRenderer renderer) {
 		mRenderer = renderer;
 	}
@@ -17,8 +20,10 @@ public class RayPicker implements IObjectPicker {
 	}
 	
 	public void getObjectAt(float x, float y) {
-		Number3D pointNear = mRenderer.unProject(x, y, 0);
-		Number3D pointFar = mRenderer.unProject(x, y, 1);
+		pointNear.setAll(x, y, 0);
+		pointFar.setAll(x, y, 1);
+		mRenderer.unproject(pointNear);
+		mRenderer.unproject(pointFar);
 		
 		RayPickingVisitor visitor = new RayPickingVisitor(pointNear, pointFar);
 		mRenderer.accept(visitor);

@@ -57,6 +57,14 @@ public class Plane {
 		else {return PlaneSide.Front;}
 	}
 
+	public PlaneSide getPointSide(float x, float y, float z) {
+		mTmp1.setAll(x, y, z);
+		float dist =Number3D.dot(mNormal, mTmp1) + d;
+		if (dist == 0) {return PlaneSide.OnPlane;}
+		else if (dist < 0){ return PlaneSide.Back;}
+		else {return PlaneSide.Front;}
+	}
+
 	public boolean isFrontFacing(Number3D direction) {
 		float dot = Number3D.dot(mNormal, direction); 
 		return dot <= 0;

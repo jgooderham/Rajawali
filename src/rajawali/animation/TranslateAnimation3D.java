@@ -13,6 +13,7 @@ public class TranslateAnimation3D extends Animation3D {
 	protected Number3D mAddedPosition = new Number3D();
 	protected boolean mOrientToPath = false;
 	protected ISpline mSplinePath;
+	private static Number3D tmpVec = new Number3D();
 
 	public TranslateAnimation3D(Number3D toPosition) {
 		super();
@@ -76,19 +77,21 @@ public class TranslateAnimation3D extends Animation3D {
 	@Override
 	protected void applyTransformation(float interpolatedTime) {
 		if (mSplinePath == null) {
-			if (mDiffPosition == null)
-				mDiffPosition = Number3D.subtract(mToPosition, mFromPosition);
+			if (mDiffPosition == null) {
+				mDiffPosition = new Number3D();
+				Number3D.subtract(mToPosition, mFromPosition, mDiffPosition);
+			}
 			mMultipliedPosition.setAllFrom(mDiffPosition);
 			mMultipliedPosition.multiply(interpolatedTime);
 			mAddedPosition.setAllFrom(mFromPosition);
 			mAddedPosition.add(mMultipliedPosition);
 			mTransformable3D.getPosition().setAllFrom(mAddedPosition);
 		} else {
-			Number3D pathPoint = mSplinePath.calculatePoint(interpolatedTime);
-			mTransformable3D.getPosition().setAllFrom(pathPoint);
+			mSplinePath.calculatePoint(interpolatedTime, mTransformable3D.getPosition());
 
 			if (mOrientToPath) {
-				mTransformable3D.setLookAt(mSplinePath.getCurrentTangent());
+				mSplinePath.getCurrentTangent(tmpVec);
+				mTransformable3D.setLookAt(tmpVec);
 			}
 		}
 	}

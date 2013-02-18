@@ -1,6 +1,6 @@
 package rajawali.animation.mesh;
 
-import rajawali.Geometry3D;
+import rajawali.Geometry3DSeparate;
 import rajawali.bounds.BoundingBox;
 import rajawali.math.Number3D;
 
@@ -15,11 +15,11 @@ public class BoneAnimationFrame implements IAnimationFrame {
 		mSkeleton = new Skeleton();
 	}
 	
-	public Geometry3D getGeometry() {
+	public Geometry3DSeparate getGeometry() {
 		return null;
 	}
 
-	public void setGeometry(Geometry3D geometry) {
+	public void setGeometry(Geometry3DSeparate geometry) {
 	}
 
 	public String getName() {

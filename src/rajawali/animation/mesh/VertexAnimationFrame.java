@@ -1,22 +1,22 @@
 package rajawali.animation.mesh;
 
-import rajawali.Geometry3D;
+import rajawali.Geometry3DSeparate;
 import rajawali.math.Number3D;
 
 public class VertexAnimationFrame implements IAnimationFrame {
-	protected Geometry3D mGeometry;
+	protected Geometry3DSeparate mGeometry;
 	protected String mName;
 	protected float[] mVertices;
 	
 	public VertexAnimationFrame() {
-		mGeometry = new Geometry3D();
+		mGeometry = new Geometry3DSeparate();
 	}
 	
-	public Geometry3D getGeometry() {
+	public Geometry3DSeparate getGeometry() {
 		return mGeometry;
 	}
 
-	public void setGeometry(Geometry3D geometry) {
+	public void setGeometry(Geometry3DSeparate geometry) {
 		mGeometry = geometry;
 	}
 
@@ -41,6 +41,8 @@ public class VertexAnimationFrame implements IAnimationFrame {
 		Number3D v2 = new Number3D();
 		Number3D v3 = new Number3D();
 		Number3D normal = new Number3D();
+		Number3D vector1 = new Number3D();
+		Number3D vector2 = new Number3D();
 		
 		// -- calculate face normals
 		for(int i=0; i<numIndices; i+=3) {
@@ -56,10 +58,10 @@ public class VertexAnimationFrame implements IAnimationFrame {
 			v2.setAll(vertices[vid2], vertices[vid2+1], vertices[vid2+2]);
 			v3.setAll(vertices[vid3], vertices[vid3+1], vertices[vid3+2]);
 			
-			Number3D vector1 = Number3D.subtract(v2, v1);
-            Number3D vector2 = Number3D.subtract(v3, v1);
+			Number3D.subtract(v2, v1, vector1);
+            Number3D.subtract(v3, v1, vector2);
             
-            normal = Number3D.cross(vector1, vector2);
+            Number3D.cross(vector1, vector2, normal);
             normal.normalize();
             
             faceNormals[i] = normal.x;
@@ -69,12 +71,10 @@ public class VertexAnimationFrame implements IAnimationFrame {
 		}
 		// -- calculate vertex normals
 		
-		Number3D vertexNormal = new Number3D();
-		
 		for(int i=0; i<numVertices; i+=3) {
 			int vIndex = i / 3;
 			
-			vertexNormal.setAll(0, 0, 0);			
+			normal.setAll(0, 0, 0);			
 			
 			for(int j=0; j<numIndices; j+=3)
 			{
@@ -83,13 +83,13 @@ public class VertexAnimationFrame implements IAnimationFrame {
 				id3 = indices[j+2];
 				
 				if(id1 == vIndex || id2 == vIndex || id3 == vIndex) {
-					vertexNormal.add(faceNormals[j], faceNormals[j+1], faceNormals[j+2]);
+					normal.add(faceNormals[j], faceNormals[j+1], faceNormals[j+2]);
 				}
 			}
-			vertexNormal.normalize();
-			vertNormals[i] = -vertexNormal.x;
-			vertNormals[i+1] = vertexNormal.y;
-			vertNormals[i+2] = -vertexNormal.z;
+			normal.normalize();
+			vertNormals[i] = -normal.x;
+			vertNormals[i+1] = normal.y;
+			vertNormals[i+2] = -normal.z;
 		}
 		//mGeometry.setNormals(vertNormals);
 		faceNormals = null;

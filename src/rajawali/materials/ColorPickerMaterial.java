@@ -5,17 +5,20 @@ import android.opengl.GLES20;
 import android.util.Log;
 
 public class ColorPickerMaterial extends AMaterial {
-	protected static final String mVShader = 
-		"uniform mat4 uMVPMatrix;\n" +
-		"uniform vec4 uPickingColor;\n" +
 
-		"attribute vec4 aPosition;\n" +
+	public static final String UNI_PICKING_COLOR = "uPickingColor";
+
+	protected static final String mVShader = 
+		"uniform mat4 " + UNI_MVP_MATRIX + ";\n" +
+		"uniform vec4 " + UNI_PICKING_COLOR + ";\n" +
+
+		"attribute vec4 " + ATTR_POSITION + ";\n" +
 
 		"varying vec4 vColor;\n" +		
 
 		"void main() {\n" +
-		"	gl_Position = uMVPMatrix * aPosition;\n" +
-		"	vColor = uPickingColor;\n" +
+		"	gl_Position = " + UNI_MVP_MATRIX + " * " + ATTR_POSITION + ";\n" +
+		"	vColor = " + UNI_PICKING_COLOR + ";\n" +
 		"}\n";
 	
 	protected static final String mFShader = 
@@ -27,7 +30,6 @@ public class ColorPickerMaterial extends AMaterial {
 		"	gl_FragColor = vColor;\n" +
 		"}\n";
 	
-	protected int muPickingColorHandle;
 	protected float[] mPickingColor;
 	
 	public ColorPickerMaterial() {
@@ -43,17 +45,16 @@ public class ColorPickerMaterial extends AMaterial {
 	@Override
 	public void useProgram() {
 		super.useProgram();
-		GLES20.glUniform4fv(muPickingColorHandle, 1, mPickingColor, 0);
+		int uni = getUniformHandle(UNI_PICKING_COLOR);
+		if (uni > -1)
+			GLES20.glUniform4fv(uni, 1, mPickingColor, 0);
 	}
 	
 	@Override
 	public void setShaders(String vertexShader, String fragmentShader)
 	{
 		super.setShaders(vertexShader, fragmentShader);
-		muPickingColorHandle = GLES20.glGetUniformLocation(mProgram, "uPickingColor");
-		if(muPickingColorHandle == -1) {
-			Log.d(Wallpaper.TAG, "Could not get uniform location for uPickingColor");
-		}
+		registerUniforms(UNI_PICKING_COLOR);
 	}
 	
 	public void setPickingColor(float[] color) {
